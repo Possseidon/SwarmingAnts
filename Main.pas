@@ -204,13 +204,11 @@ end;
 
 procedure TfrmMain.FormMouseWheel(Sender: TObject; Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint;
 var Handled: Boolean);
-var
-  DisplayPos: TPoint;
 begin
-  DisplayPos := pbDisplay.ScreenToClient(MousePos);
-  if pbDisplay.BoundsRect.Contains(DisplayPos) then
+  MousePos := MousePos - pbDisplay.ClientToScreen(Point(0, 0));
+  if Rect(0, 0, pbDisplay.Width, pbDisplay.Height).Contains(MousePos) then
   begin
-    FDisplay.MouseWheel(Shift, WheelDelta, DisplayPos);
+    FDisplay.MouseWheel(Shift, WheelDelta, MousePos);
     Handled := True;
   end;
 end;

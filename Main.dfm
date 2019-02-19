@@ -28,8 +28,6 @@ object frmMain: TfrmMain
       item
         Width = 420
       end>
-    ExplicitTop = 533
-    ExplicitWidth = 885
   end
   object pnlMain: TPanel
     Left = 222
@@ -40,14 +38,12 @@ object frmMain: TfrmMain
     BevelOuter = bvNone
     ParentBackground = False
     TabOrder = 1
-    ExplicitWidth = 663
-    ExplicitHeight = 533
     object pbDisplay: TPaintBox
       AlignWithMargins = True
       Left = 0
       Top = 35
-      Width = 660
-      Height = 426
+      Width = 667
+      Height = 432
       Margins.Left = 0
       Align = alClient
       Color = clBtnFace
@@ -67,8 +63,6 @@ object frmMain: TfrmMain
       Caption = 'Fortschritt'
       TabOrder = 0
       Visible = False
-      ExplicitTop = 467
-      ExplicitWidth = 657
       object pbProgressBar: TProgressBar
         AlignWithMargins = True
         Left = 5
@@ -77,7 +71,6 @@ object frmMain: TfrmMain
         Height = 17
         Align = alBottom
         TabOrder = 0
-        ExplicitWidth = 647
       end
       object pnlProgress: TPanel
         Left = 2
@@ -87,7 +80,6 @@ object frmMain: TfrmMain
         Align = alClient
         BevelOuter = bvNone
         TabOrder = 1
-        ExplicitWidth = 653
         object lbProgressInfo: TLabel
           AlignWithMargins = True
           Left = 3
@@ -106,7 +98,6 @@ object frmMain: TfrmMain
           Height = 17
           Align = alRight
           Caption = '0%'
-          ExplicitLeft = 633
           ExplicitHeight = 13
         end
       end
@@ -115,7 +106,7 @@ object frmMain: TfrmMain
       AlignWithMargins = True
       Left = 3
       Top = 3
-      Width = 660
+      Width = 667
       Height = 26
       Margins.Right = 0
       AutoSize = True
@@ -124,7 +115,6 @@ object frmMain: TfrmMain
       EdgeBorders = [ebLeft, ebTop, ebBottom]
       Images = ilIcons
       TabOrder = 1
-      ExplicitWidth = 464
       object ToolButton3: TToolButton
         Left = 0
         Top = 0
@@ -173,7 +163,6 @@ object frmMain: TfrmMain
     BevelInner = bvNone
     BorderStyle = bsNone
     TabOrder = 2
-    ExplicitHeight = 527
     object gbSettings: TGroupBox
       Left = 0
       Top = 0
@@ -219,9 +208,6 @@ object frmMain: TfrmMain
       end
       object miClear: TMenuItem
         Action = actClear
-      end
-      object miGenerateGrid: TMenuItem
-        Action = actGenerateGrid
       end
       object N5: TMenuItem
         Caption = '-'

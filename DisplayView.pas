@@ -25,12 +25,13 @@ uses
 
 type
 
-  TSelectionMode = (
-    smPoint,
-    smConnection
-    );
-
-  TSelectionModes = set of TSelectionMode;
+  TEditorTool = (
+    etMove,
+    etPoint,
+    etConnection,
+    etStart,
+    etFinish
+  );
 
   TDisplay = class
   private
@@ -41,9 +42,9 @@ type
     FPointSize: Single;
     FLineWidth: Single;
     FEditable: Boolean;
+    FTool: TEditorTool;
     FPointAtCursor: TOpt<TGraph.TPoint>;
     FConnectionAtCursor: TOpt<TGraph.TConnection>;
-    FSelectionModes: TSelectionModes;
     FSmoothing: Boolean;
 
     procedure PaintBoxPaint(Sender: TObject);
@@ -73,7 +74,7 @@ type
     property Graph: TGraph read FGraph;
 
     property Editable: Boolean read FEditable write FEditable;
-    property SelectionModes: TSelectionModes read FSelectionModes;
+    property Tool: TEditorTool read FTool write FTool;
 
     property Smoothing: Boolean read FSmoothing write SetSmoothing;
 
@@ -123,8 +124,6 @@ begin
 
   FPointSize := 12;
   FLineWidth := 5;
-
-  FSelectionModes := [smPoint, smConnection];
 end;
 
 function TDisplay.CursorToGraph(APos: TVector2): TVector2;
@@ -300,25 +299,24 @@ begin
   OldPointAtCursor := FPointAtCursor;
   FPointAtCursor.Clear;
   ClosestDistance := PointSize / 2;
-  if smPoint in SelectionModes then
+
+  // Point selection
+  for Point in Graph.Points do
   begin
-    for Point in Graph.Points do
+    NewDistance := Point.Pos.DistanceTo(APos);
+    if NewDistance < ClosestDistance then
     begin
-      NewDistance := Point.Pos.DistanceTo(APos);
-      if NewDistance < ClosestDistance then
-      begin
-        ClosestDistance := NewDistance;
-        FPointAtCursor := Point;
-      end;
+      ClosestDistance := NewDistance;
+      FPointAtCursor := Point;
     end;
   end;
 
   // If no point is found, find connection
   OldConnectionAtCursor := FConnectionAtCursor;
   FConnectionAtCursor.Clear;
-  if not FPointAtCursor.HasValue and (smConnection in SelectionModes) then
+  if not FPointAtCursor.HasValue then
   begin
-    // TODO
+    // TODO: Connection selection
   end;
 
   if (FPointAtCursor <> OldPointAtCursor) or (FConnectionAtCursor <> OldConnectionAtCursor) then
