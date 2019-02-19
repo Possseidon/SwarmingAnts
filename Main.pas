@@ -82,12 +82,23 @@ type
     miEdit: TMenuItem;
     miClear: TMenuItem;
     miGenerateGrid: TMenuItem;
+    actPointTool: TAction;
+    actConnectionTool: TAction;
+    N5: TMenuItem;
+    PunktWerkzeug1: TMenuItem;
+    VerbindungsWerkzeug1: TMenuItem;
+    actMoveTool: TAction;
+    ToolButton5: TToolButton;
+    KameraTool1: TMenuItem;
     procedure actClearExecute(Sender: TObject);
+    procedure actConnectionToolExecute(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure actEditModeExecute(Sender: TObject);
     procedure actExitExecute(Sender: TObject);
     procedure actGenerateGridExecute(Sender: TObject);
+    procedure actMoveToolExecute(Sender: TObject);
+    procedure actPointToolExecute(Sender: TObject);
     procedure actSmoothingExecute(Sender: TObject);
     procedure actResetViewExecute(Sender: TObject);
     procedure actShowProgressExecute(Sender: TObject);
@@ -112,6 +123,11 @@ implementation
 procedure TfrmMain.actClearExecute(Sender: TObject);
 begin
   FDisplay.Graph.Clear;
+end;
+
+procedure TfrmMain.actConnectionToolExecute(Sender: TObject);
+begin
+  // nothing
 end;
 
 procedure TfrmMain.FormDestroy(Sender: TObject);
@@ -151,6 +167,16 @@ end;
 procedure TfrmMain.actGenerateGridExecute(Sender: TObject);
 begin
   mdlgGenerateGrid.Execute(FDisplay.Graph);
+end;
+
+procedure TfrmMain.actMoveToolExecute(Sender: TObject);
+begin
+  // nothing
+end;
+
+procedure TfrmMain.actPointToolExecute(Sender: TObject);
+begin
+  // nothing
 end;
 
 procedure TfrmMain.actSmoothingExecute(Sender: TObject);

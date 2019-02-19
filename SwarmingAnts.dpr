@@ -1,4 +1,4 @@
-program SwarmIntelligenceDemo;
+program SwarmingAnts;
 
 uses
   Vcl.Forms,
