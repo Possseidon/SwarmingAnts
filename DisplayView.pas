@@ -31,7 +31,7 @@ type
     etConnection,
     etStart,
     etFinish
-  );
+    );
 
   TDisplay = class
   private
@@ -335,8 +335,8 @@ begin
     (Scale < 0.2) and (AFactor < 1) then
     Exit;
 
-  ScalePos.X := APos.X - PaintBox.Width / 2;
-  ScalePos.Y := APos.Y - PaintBox.Height / 2;
+  ScalePos.X := APos.X - PaintBox.ClientWidth / 2;
+  ScalePos.Y := APos.Y - PaintBox.ClientHeight / 2;
 
   FCamera.Translate(-ScalePos.X, -ScalePos.Y, MatrixOrderAppend);
   FCamera.Scale(AFactor, AFactor, MatrixOrderAppend);
