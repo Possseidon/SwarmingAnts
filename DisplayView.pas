@@ -98,6 +98,7 @@ type
 
     procedure UpdateMouseDrag(APos: TVector2);
     procedure UpdateMouseHover(APos: TVector2);
+    procedure SetCamera(const Value: TCamera);
 
   protected
     procedure Paint(G: IGPGraphics); virtual;
@@ -116,7 +117,7 @@ type
     property PaintBox: TPaintBox read FPaintBox;
     property PaintBoxSize: TIntVector2 read GetPaintBoxSize;
 
-    property Camera: TCamera read FCamera;
+    property Camera: TCamera read FCamera write SetCamera;
     property CameraMatrix: IGPMatrix read GetCameraMatrix;
 
     property PointSize: Single read FPointSize write SetPointSize;
@@ -142,6 +143,7 @@ type
     procedure SetTool(const Value: TEditorTool);
 
     function GetOnToolChange: TEvent.TAccess;
+    procedure SetGraph(const Value: TGraph);
 
   protected
     procedure Paint(G: IGPGraphics); override;
@@ -155,7 +157,7 @@ type
     constructor Create(APaintBox: TPaintBox);
     destructor Destroy; override;
 
-    property Graph: TGraph read FGraph;
+    property Graph: TGraph read FGraph write SetGraph;
 
     property Tool: TEditorTool read FTool write SetTool;
 
@@ -267,6 +269,11 @@ end;
 procedure TDisplay.MouseUp(APos: TVector2);
 begin
   // nothing
+end;
+
+procedure TDisplay.SetCamera(const Value: TCamera);
+begin
+  Camera.Assign(Value);
 end;
 
 procedure TDisplay.SetLineWidth(const Value: Single);
@@ -527,6 +534,11 @@ begin
   G.Transform := CameraMatrix;
 
   Paint(G);
+end;
+
+procedure TEditorDisplay.SetGraph(const Value: TGraph);
+begin
+  Graph.Assign(Value);
 end;
 
 procedure TEditorDisplay.SetTool(const Value: TEditorTool);

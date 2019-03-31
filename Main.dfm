@@ -444,6 +444,7 @@ object frmMain: TfrmMain
       Caption = #214'ffnen...'
       Hint = #214'ffnet ein Projekt.'
       ShortCut = 16463
+      OnExecute = actOpenExecute
     end
     object actSave: TAction
       Category = 'File'
@@ -458,6 +459,7 @@ object frmMain: TfrmMain
         'Speichert das momentan ge'#246'ffnete Projekt unter einem bestimmten ' +
         'Namen.'
       ShortCut = 24659
+      OnExecute = actSaveAsExecute
     end
     object actExit: TAction
       Category = 'File'
@@ -803,5 +805,18 @@ object frmMain: TfrmMain
       0000000000000000000000000000000000000000000000000000000000000000
       0000000000000000000000000000000000000000000000000000000000000000
       000000000000}
+  end
+  object dlgSave: TSaveDialog
+    DefaultExt = '.json'
+    FileName = 'Graph'
+    Filter = 'Wegpunktenetz|*.json'
+    Left = 257
+    Top = 112
+  end
+  object dlgOpen: TOpenDialog
+    Filter = 'Wegpunktenetz|*.json'
+    Options = [ofPathMustExist, ofFileMustExist, ofEnableSizing]
+    Left = 313
+    Top = 112
   end
 end

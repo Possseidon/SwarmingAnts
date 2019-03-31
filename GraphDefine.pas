@@ -3,14 +3,18 @@ unit GraphDefine;
 interface
 
 uses
+  System.SysUtils,
+
   Pengine.EventHandling,
   Pengine.Vector,
   Pengine.Collections,
-  Pengine.IntMaths;
+  Pengine.IntMaths,
+  Pengine.Interfaces,
+  Pengine.JSON;
 
 type
 
-  TGraph = class
+  TGraph = class(TInterfaceBase, IJSerializable)
   public type
 
     TConnection = class;
@@ -187,6 +191,10 @@ type
     /// <summary>Called whenever the graph changes in any way.</summary>
     function OnChange: TEvent.TAccess;
 
+    // IJSerializable
+    function GetJVersion: Integer;
+    procedure DefineJStorage(ASerializer: TJSerializer);
+
   end;
 
 implementation
@@ -354,6 +362,60 @@ begin
   FConnections := TConnections.Create;
 end;
 
+procedure TGraph.DefineJStorage(ASerializer: TJSerializer);
+var
+  Point: TPoint;
+  Connection: TConnection;
+  JArray, JPoint: TJArray;
+  JPointIndex: TJValue;
+  JConnection: TJObject;
+begin
+  case ASerializer.Mode of
+    smSerialize:
+      begin
+        if StartPoint <> nil then
+          ASerializer.Value['start'] := StartPoint.Index;
+        if FinishPoint <> nil then
+          ASerializer.Value['finish'] := FinishPoint.Index;
+
+        JArray := ASerializer.Value['points'];
+        for Point in Points do
+        begin
+          JPoint := JArray.AddArray;
+          JPoint[0] := Point.Pos.X;
+          JPoint[1] := Point.Pos.Y;
+        end;
+
+        JArray := ASerializer.Value['connections'];
+        for Connection in Connections do
+        begin
+          JConnection := JArray.AddObject;
+          JConnection['from'] := Connection.PointA.Index;
+          JConnection['to'] := Connection.PointB.Index;
+          JConnection['cost'] := Connection.CostFactor;
+        end;
+      end;
+    smUnserialize:
+      begin
+        Clear;
+
+        for JPoint in ASerializer.Value['points'].AsArray do
+          AddPoint(Vec2(JPoint[0], JPoint[1]));
+
+        for JConnection in ASerializer.Value['connections'].AsArray do
+        begin
+          Connection := Connect(Points[JConnection['from']], Points[JConnection['to']]);
+          Connection.CostFactor := JConnection['cost'];
+        end;
+
+        if ASerializer.Value.Get('start', JPointIndex) then
+          FStartPoint := Points[JPointIndex];
+        if ASerializer.Value.Get('finish', JPointIndex) then
+          FFinishPoint := Points[JPointIndex];
+      end;
+  end;
+end;
+
 destructor TGraph.Destroy;
 begin
   Clear;
@@ -365,6 +427,11 @@ end;
 function TGraph.GetConnections: TConnections.TReader;
 begin
   Result := FConnections.Reader;
+end;
+
+function TGraph.GetJVersion: Integer;
+begin
+  Result := 0;
 end;
 
 function TGraph.GetPoints: TPoints.TReader;

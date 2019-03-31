@@ -31,7 +31,9 @@ uses
   DisplayView,
   GraphDefine,
   MiniDialogGenerateGrid,
-  AntDefine;
+  AntDefine,
+  Pengine.JSON,
+  Vcl.Dialogs;
 
 type
 
@@ -114,6 +116,8 @@ type
     lbTodoChart: TLabel;
     splStatistics: TSplitter;
     lbStepSizeUnit: TLabel;
+    dlgSave: TSaveDialog;
+    dlgOpen: TOpenDialog;
     procedure actClearExecute(Sender: TObject);
     procedure actConnectionToolExecute(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -122,9 +126,11 @@ type
     procedure actExitExecute(Sender: TObject);
     procedure actFinishToolExecute(Sender: TObject);
     procedure actGenerateGridExecute(Sender: TObject);
+    procedure actOpenExecute(Sender: TObject);
     procedure actSelectionToolExecute(Sender: TObject);
     procedure actPointToolExecute(Sender: TObject);
     procedure actResetViewExecute(Sender: TObject);
+    procedure actSaveAsExecute(Sender: TObject);
     procedure actSingleStepExecute(Sender: TObject);
     procedure actSingleStepUpdate(Sender: TObject);
     procedure actStartToolExecute(Sender: TObject);
@@ -209,6 +215,38 @@ begin
   mdlgGenerateGrid.Execute(EditorDisplay.Graph);
 end;
 
+procedure TfrmMain.actOpenExecute(Sender: TObject);
+var
+  JGraph: TJObject;
+begin
+  if not dlgOpen.Execute then
+    Exit;
+
+  JGraph := TJObject.CreateFromFile(dlgOpen.FileName);
+  try
+    TJSerializer.Unserialize(FBackupGraph, JGraph);
+
+    if Editable then
+    begin
+      EditorDisplay.Graph := FBackupGraph;
+    end
+    else
+    begin
+      FDisplay.Free;
+      FDisplay := TSimulationDisplay.Create(pbDisplay, FBackupGraph);
+      FSimulation.Free;
+      FSimulation := TSimulation.Create(SimulationDisplay.PheromoneMap);
+      SyncSimulationData;
+    end;
+
+    pbDisplay.Invalidate;
+
+  finally
+    JGraph.Free;
+
+  end;
+end;
+
 procedure TfrmMain.actSelectionToolExecute(Sender: TObject);
 begin
   EditorDisplay.Tool := etSelection;
@@ -222,6 +260,30 @@ end;
 procedure TfrmMain.actResetViewExecute(Sender: TObject);
 begin
   FDisplay.Camera.Reset;
+end;
+
+procedure TfrmMain.actSaveAsExecute(Sender: TObject);
+var
+  Graph: IJSerializable;
+  Serialized: TJObject;
+begin
+  if not dlgSave.Execute then
+    Exit;
+
+  if Editable then
+    Graph := EditorDisplay.Graph
+  else
+    Graph := FBackupGraph;
+
+  Serialized := TJSerializer.Serialize(Graph);
+  try
+    ForceDirectories(ExtractFilePath(dlgSave.FileName));
+    Serialized.SaveToFile(dlgSave.FileName);
+
+  finally
+    Serialized.Free;
+
+  end;
 end;
 
 procedure TfrmMain.actSingleStepExecute(Sender: TObject);
@@ -370,7 +432,7 @@ begin
     FDisplay.Free;
     FDisplay := TEditorDisplay.Create(pbDisplay);
     EditorDisplay.OnToolChange.Add(DisplayToolChange);
-    EditorDisplay.Graph.Assign(FBackupGraph);
+    EditorDisplay.Graph := FBackupGraph;
   end
   else
   begin
@@ -387,7 +449,7 @@ begin
 
   if Camera <> nil then
   begin
-    FDisplay.Camera.Assign(Camera);
+    FDisplay.Camera := Camera;
     Camera.Free;
   end;
 
@@ -403,7 +465,8 @@ begin
     procedure(const Action: TContainedAction; var Done: Boolean)
     begin
       Action.Enabled := Editable or (Action = actEditorActive);
-    end, 'Editor');
+    end,
+    'Editor');
 end;
 
 end.
