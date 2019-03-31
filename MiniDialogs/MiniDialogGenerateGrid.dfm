@@ -53,7 +53,7 @@ object mdlgGenerateGrid: TmdlgGenerateGrid
     MaxValue = 100
     MinValue = 2
     TabOrder = 0
-    Value = 20
+    Value = 10
   end
   object seHeight: TSpinEdit
     Left = 68
@@ -65,7 +65,7 @@ object mdlgGenerateGrid: TmdlgGenerateGrid
     MaxValue = 100
     MinValue = 2
     TabOrder = 1
-    Value = 20
+    Value = 10
   end
   object seDistance: TSpinEdit
     Left = 68
@@ -74,8 +74,8 @@ object mdlgGenerateGrid: TmdlgGenerateGrid
     Height = 22
     Anchors = [akTop, akRight]
     Increment = 5
-    MaxValue = 500
-    MinValue = 10
+    MaxValue = 100
+    MinValue = 5
     TabOrder = 2
     Value = 15
   end

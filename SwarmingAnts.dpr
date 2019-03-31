@@ -6,7 +6,8 @@ uses
   DisplayView in 'DisplayView.pas',
   GraphDefine in 'GraphDefine.pas',
   MiniDialogGenerateGrid in 'MiniDialogs\MiniDialogGenerateGrid.pas' {mdlgGenerateGrid},
-  MiniDialogGenerateRandomPoints in 'MiniDialogs\MiniDialogGenerateRandomPoints.pas' {mdlgGenerateRandomPoints};
+  MiniDialogGenerateRandomPoints in 'MiniDialogs\MiniDialogGenerateRandomPoints.pas' {mdlgGenerateRandomPoints},
+  AntDefine in 'AntDefine.pas';
 
 {$R *.res}
 
