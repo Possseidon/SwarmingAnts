@@ -90,8 +90,6 @@ type
     StartWerkzeug1: TMenuItem;
     actFinishTool1: TMenuItem;
     N6: TMenuItem;
-    btnSingleStep: TButton;
-    btnStart: TButton;
     actSingleStep: TAction;
     actStart: TAction;
     lbBatchInterval: TLabel;
@@ -118,6 +116,12 @@ type
     lbStepSizeUnit: TLabel;
     dlgSave: TSaveDialog;
     dlgOpen: TOpenDialog;
+    tmrUpdate: TTimer;
+    actReset: TAction;
+    gbControl: TGroupBox;
+    btnReset: TButton;
+    btnStart: TButton;
+    btnSingleStep: TButton;
     procedure actClearExecute(Sender: TObject);
     procedure actConnectionToolExecute(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -129,11 +133,14 @@ type
     procedure actOpenExecute(Sender: TObject);
     procedure actSelectionToolExecute(Sender: TObject);
     procedure actPointToolExecute(Sender: TObject);
+    procedure actResetExecute(Sender: TObject);
     procedure actResetViewExecute(Sender: TObject);
     procedure actSaveAsExecute(Sender: TObject);
     procedure actSingleStepExecute(Sender: TObject);
     procedure actSingleStepUpdate(Sender: TObject);
+    procedure actStartExecute(Sender: TObject);
     procedure actStartToolExecute(Sender: TObject);
+    procedure actStartUpdate(Sender: TObject);
     procedure edtBatchIntervalExit(Sender: TObject);
     procedure edtPheromoneTrailExit(Sender: TObject);
     procedure edtPheromoneDissipationExit(Sender: TObject);
@@ -141,6 +148,7 @@ type
     procedure FormMouseWheel(Sender: TObject; Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint;
       var Handled: Boolean);
     procedure seBatchSizeExit(Sender: TObject);
+    procedure tmrUpdateTimer(Sender: TObject);
   private
     FBackupGraph: TGraph;
     FDisplay: TDisplay;
@@ -257,6 +265,12 @@ begin
   EditorDisplay.Tool := etPoint;
 end;
 
+procedure TfrmMain.actResetExecute(Sender: TObject);
+begin
+  FSimulation.Clear;
+  pbDisplay.Invalidate;
+end;
+
 procedure TfrmMain.actResetViewExecute(Sender: TObject);
 begin
   FDisplay.Camera.Reset;
@@ -288,7 +302,7 @@ end;
 
 procedure TfrmMain.actSingleStepExecute(Sender: TObject);
 begin
-  FSimulation.Step;
+  FSimulation.Step(1);
   pbDisplay.Invalidate;
 end;
 
@@ -297,9 +311,23 @@ begin
   actSingleStep.Enabled := PheromoneMap.Valid;
 end;
 
+procedure TfrmMain.actStartExecute(Sender: TObject);
+begin
+  tmrUpdate.Enabled := not tmrUpdate.Enabled;
+end;
+
 procedure TfrmMain.actStartToolExecute(Sender: TObject);
 begin
   EditorDisplay.Tool := etStart;
+end;
+
+procedure TfrmMain.actStartUpdate(Sender: TObject);
+begin
+  actStart.Enabled := PheromoneMap.Valid;
+  if tmrUpdate.Enabled then
+    actStart.Caption := 'Stop'
+  else
+    actStart.Caption := 'Start';
 end;
 
 procedure TfrmMain.DisplayToolChange;
@@ -344,9 +372,9 @@ begin
   if FSimulation = nil then
     Exit;
   if Single.TryParse(edtPheromoneDissipation.Text, Value, TFormatSettings.Invariant) then
-    PheromoneMap.PheromoneDissipation := Value
+    PheromoneMap.PheromoneDissipation := Value / 100
   else
-    edtPheromoneDissipation.Text := PrettyFloat(PheromoneMap.PheromoneDissipation);
+    edtPheromoneDissipation.Text := PrettyFloat(Single(PheromoneMap.PheromoneDissipation * 100));
 end;
 
 procedure TfrmMain.edtStepSizeExit(Sender: TObject);
@@ -467,6 +495,18 @@ begin
       Action.Enabled := Editable or (Action = actEditorActive);
     end,
     'Editor');
+end;
+
+procedure TfrmMain.tmrUpdateTimer(Sender: TObject);
+begin
+  if Editable then
+  begin
+    tmrUpdate.Enabled := False;
+    Exit;
+  end;
+
+  FSimulation.Step(tmrUpdate.Interval / MSecsPerSec);
+  pbDisplay.Invalidate;
 end;
 
 end.

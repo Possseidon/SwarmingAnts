@@ -88,7 +88,7 @@ type
 
     function ConvertPoint(APos: TVector2; ACursorToGraph: Boolean): TVector2;
     function CursorToGraph(APos: TVector2): TVector2;
-    function GraphToCursor(APos: TVector2): TVector2;
+    // function GraphToCursor(APos: TVector2): TVector2;
 
     function GetCameraMatrix: IGPMatrix;
     function GetPaintBoxSize: TIntVector2;
@@ -246,10 +246,12 @@ begin
   Result := IVec2(PaintBox.Width, PaintBox.Height);
 end;
 
-function TDisplay.GraphToCursor(APos: TVector2): TVector2;
-begin
+{
+  function TDisplay.GraphToCursor(APos: TVector2): TVector2;
+  begin
   Result := ConvertPoint(APos, False);
-end;
+  end;
+}
 
 procedure TDisplay.Hover(APos: TVector2);
 begin
@@ -636,15 +638,25 @@ procedure TSimulationDisplay.Paint(G: IGPGraphics);
 var
   Connection: TPheromoneMap.TConnection;
   Point: TPheromoneMap.TPoint;
-  Ant: TAnt;
+  Ant: TMovingAnt;
   ColorRGB: TColorRGBA;
   Color: TGPColor;
-  Brush: IGPBrush;
+  Brush, StartFinishBrush: IGPBrush;
   Rect: TGPRectF;
+  MaxPheromones: Single;
 begin
+  MaxPheromones := 0;
+  for Connection in PheromoneMap.Connections do
+    MaxPheromones := Max(MaxPheromones, Connection.Pheromones);
+
+  // Prevent division by zero
+  if MaxPheromones = 0 then
+    MaxPheromones := 1;
+
   for Connection in PheromoneMap.Connections do
   begin
-    ColorRGB := TColorRGB.HSV(2 - Connection.Pheromones, 1.0, 0.8);
+
+    ColorRGB := TColorRGB.HSV(2 - Connection.Pheromones / MaxPheromones * 3, 1.0, 0.8);
     Color.InitializeFromColorRef(ColorRGB.ToWinColor);
 
     with Connection do
@@ -654,18 +666,22 @@ begin
   ColorRGB := TColorRGB.HSV(2, 1.0, 0.6);
   Color.InitializeFromColorRef(ColorRGB.ToWinColor);
   Brush := TGPSolidBrush.Create(Color);
+  StartFinishBrush := TGPSolidBrush.Create(TGPColor.Brown);
   for Point in PheromoneMap.Points do
   begin
-    with Connection do
+    with Point do
     begin
-      Rect.Initialize(Point.Pos.X, Point.Pos.Y, 0, 0);
+      Rect.Initialize(Pos.X, Pos.Y, 0, 0);
       Rect.Inflate(PointSize / 2);
-      G.FillEllipse(Brush, Rect);
+      if IsStart or IsFinish then
+        G.FillEllipse(StartFinishBrush, Rect)
+      else
+        G.FillEllipse(Brush, Rect);
     end;
   end;
 
-  Brush := TGPSolidBrush.Create(TGPColor.Black);
-  for Ant in PheromoneMap.Ants do
+  Brush := TGPSolidBrush.Create(TGPColor.Create(128, 0, 0, 0));
+  for Ant in PheromoneMap.ActiveAnts do
   begin
     Rect.Initialize(Ant.Position.VisualPos.X, Ant.Position.VisualPos.Y, 0, 0);
     Rect.Inflate(LineWidth);

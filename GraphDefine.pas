@@ -368,7 +368,8 @@ var
   Connection: TConnection;
   JArray, JPoint: TJArray;
   JPointIndex: TJValue;
-  JConnection: TJObject;
+  JConnection: TJValue;
+  JPoints: TJArray;
 begin
   case ASerializer.Mode of
     smSerialize:
@@ -389,10 +390,16 @@ begin
         JArray := ASerializer.Value['connections'];
         for Connection in Connections do
         begin
-          JConnection := JArray.AddObject;
-          JConnection['from'] := Connection.PointA.Index;
-          JConnection['to'] := Connection.PointB.Index;
-          JConnection['cost'] := Connection.CostFactor;
+          if Connection.CostFactor <> 1 then
+          begin
+            JConnection := JArray.AddObject;
+            JConnection['cost'] := Connection.CostFactor;
+            JPoints := JConnection.AddArray('points');
+          end
+          else
+            JPoints := JArray.AddArray;
+          JPoints[0] := Connection.PointA.Index;
+          JPoints[1] := Connection.PointB.Index;
         end;
       end;
     smUnserialize:
@@ -404,8 +411,13 @@ begin
 
         for JConnection in ASerializer.Value['connections'].AsArray do
         begin
-          Connection := Connect(Points[JConnection['from']], Points[JConnection['to']]);
-          Connection.CostFactor := JConnection['cost'];
+          if JConnection.IsObject then
+            JPoints := JConnection['points']
+          else
+            JPoints := JConnection;
+          Connection := Connect(Points[JPoints[0]], Points[JPoints[1]]);
+          if JConnection.IsObject then
+            Connection.CostFactor := JConnection['cost'];
         end;
 
         if ASerializer.Value.Get('start', JPointIndex) then

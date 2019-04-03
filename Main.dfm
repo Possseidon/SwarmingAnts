@@ -165,13 +165,10 @@ object frmMain: TfrmMain
       Left = 3
       Top = 3
       Width = 227
-      Height = 201
+      Height = 166
       Align = alTop
       Caption = 'Simulation'
       TabOrder = 0
-      DesignSize = (
-        227
-        201)
       object lbBatchInterval: TLabel
         Left = 16
         Top = 28
@@ -210,9 +207,9 @@ object frmMain: TfrmMain
       object lbPheromoneDissipationUnit: TLabel
         Left = 202
         Top = 83
-        Width = 11
+        Width = 20
         Height = 13
-        Caption = '%'
+        Caption = '%/s'
       end
       object lbStepSize: TLabel
         Left = 16
@@ -224,34 +221,16 @@ object frmMain: TfrmMain
       object lbStepSizeUnit: TLabel
         Left = 202
         Top = 137
-        Width = 16
+        Width = 17
         Height = 13
-        Caption = 'sec'
-      end
-      object btnSingleStep: TButton
-        Left = 112
-        Top = 166
-        Width = 84
-        Height = 25
-        Action = actSingleStep
-        Anchors = [akLeft, akBottom]
-        TabOrder = 0
-      end
-      object btnStart: TButton
-        Left = 22
-        Top = 166
-        Width = 84
-        Height = 25
-        Action = actStart
-        Anchors = [akLeft, akBottom]
-        TabOrder = 1
+        Caption = 'm/s'
       end
       object edtBatchInterval: TEdit
         Left = 112
         Top = 25
         Width = 84
         Height = 21
-        TabOrder = 2
+        TabOrder = 0
         OnExit = edtBatchIntervalExit
       end
       object seBatchSize: TSpinEdit
@@ -261,7 +240,7 @@ object frmMain: TfrmMain
         Height = 22
         MaxValue = 500
         MinValue = 1
-        TabOrder = 3
+        TabOrder = 1
         Value = 1
         OnExit = seBatchSizeExit
       end
@@ -270,7 +249,7 @@ object frmMain: TfrmMain
         Top = 80
         Width = 84
         Height = 21
-        TabOrder = 4
+        TabOrder = 2
         OnExit = edtPheromoneDissipationExit
       end
       object edtPheromoneTrail: TEdit
@@ -278,7 +257,7 @@ object frmMain: TfrmMain
         Top = 107
         Width = 84
         Height = 21
-        TabOrder = 5
+        TabOrder = 3
         OnExit = edtPheromoneTrailExit
       end
       object edtStepSize: TEdit
@@ -286,22 +265,24 @@ object frmMain: TfrmMain
         Top = 134
         Width = 84
         Height = 21
-        TabOrder = 6
+        TabOrder = 4
         OnExit = edtStepSizeExit
       end
     end
     object gbPopulation: TGroupBox
       AlignWithMargins = True
       Left = 3
-      Top = 210
+      Top = 269
       Width = 227
-      Height = 326
+      Height = 267
       Align = alClient
       Caption = 'Population'
       TabOrder = 1
+      ExplicitTop = 237
+      ExplicitHeight = 299
       DesignSize = (
         227
-        326)
+        267)
       object lbBatch: TLabel
         Left = 16
         Top = 27
@@ -318,11 +299,12 @@ object frmMain: TfrmMain
       end
       object lbTodoAntData: TLabel
         Left = 56
-        Top = 272
+        Top = 213
         Width = 79
         Height = 13
         Anchors = [akLeft, akBottom]
         Caption = 'TODO: Ant Data'
+        ExplicitTop = 272
       end
       object seBatch: TSpinEdit
         Left = 112
@@ -338,10 +320,51 @@ object frmMain: TfrmMain
         Left = 3
         Top = 142
         Width = 212
-        Height = 100
+        Height = 41
         Anchors = [akLeft, akTop, akBottom]
         ItemHeight = 13
         TabOrder = 1
+        ExplicitHeight = 73
+      end
+    end
+    object gbControl: TGroupBox
+      AlignWithMargins = True
+      Left = 3
+      Top = 175
+      Width = 227
+      Height = 88
+      Align = alTop
+      Caption = 'Steuerung'
+      TabOrder = 2
+      DesignSize = (
+        227
+        88)
+      object btnReset: TButton
+        Left = 10
+        Top = 23
+        Width = 84
+        Height = 25
+        Action = actReset
+        Anchors = [akLeft, akBottom]
+        TabOrder = 0
+      end
+      object btnStart: TButton
+        Left = 112
+        Top = 23
+        Width = 84
+        Height = 25
+        Action = actStart
+        Anchors = [akLeft, akBottom]
+        TabOrder = 1
+      end
+      object btnSingleStep: TButton
+        Left = 112
+        Top = 54
+        Width = 84
+        Height = 25
+        Action = actSingleStep
+        Anchors = [akLeft, akBottom]
+        TabOrder = 2
       end
     end
   end
@@ -527,6 +550,13 @@ object frmMain: TfrmMain
     object actStart: TAction
       Category = 'Simulation'
       Caption = 'Start'
+      OnExecute = actStartExecute
+      OnUpdate = actStartUpdate
+    end
+    object actReset: TAction
+      Category = 'Simulation'
+      Caption = 'Zur'#252'cksetzen'
+      OnExecute = actResetExecute
     end
   end
   object ilIcons: TImageList
@@ -818,5 +848,12 @@ object frmMain: TfrmMain
     Options = [ofPathMustExist, ofFileMustExist, ofEnableSizing]
     Left = 313
     Top = 112
+  end
+  object tmrUpdate: TTimer
+    Enabled = False
+    Interval = 20
+    OnTimer = tmrUpdateTimer
+    Left = 257
+    Top = 176
   end
 end

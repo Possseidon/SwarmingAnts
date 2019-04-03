@@ -9,16 +9,17 @@ uses
   Pengine.Vector,
   Pengine.EventHandling,
 
-  GraphDefine;
+  GraphDefine,
+  System.Math;
 
 type
 
-  TAnt = class;
+  TMovingAnt = class;
 
   TPheromoneMap = class
   public type
 
-    TAnts = TRefArray<TAnt>;
+    TAnts = TRefArray<TMovingAnt>;
 
     TConnection = class;
 
@@ -39,7 +40,11 @@ type
 
       property Connections: TConnections.TReader read GetConnections;
 
+      function ConnectionTo(APoint: TPoint): TConnection;
+
       property Pos: TVector2 read FPos;
+      function IsStart: Boolean;
+      function IsFinish: Boolean;
 
     end;
 
@@ -64,7 +69,7 @@ type
       function Other(APoint: TPoint): TPoint;
 
       /// <summary>Dissipates a given percentage of pheromones on this connection.</summary>
-      procedure DissipatePheromones(APercentage: Single);
+      // procedure DissipatePheromones(APercentage: Single);
 
       /// <summary>Adds a given amount of pheromones on this connection.</summary>
       procedure LeaveTrail(AAmount: Single);
@@ -103,14 +108,17 @@ type
     FStartPoint: TPoint;
     FFinishPoint: TPoint;
     FAnts: TAnts;
+    FActiveAnts: TAnts;
     FAntSpeed: Single;
     FPheromoneDissipation: Single;
     FPheromoneTrail: Single;
+    FInfluencedFactor: Single;
     FValid: Boolean;
 
     function GetConnections: TConnections.TReader;
     function GetPoints: TPoints.TReader;
     function GetAnts: TAnts.TReader;
+    function GetActiveAnts: TAnts.TReader;
 
   public
     constructor Create(AGraph: TGraph);
@@ -126,16 +134,20 @@ type
     property StartPoint: TPoint read FStartPoint;
     property FinishPoint: TPoint read FFinishPoint;
 
-    /// <summary>All ants on the map.</summary>
+    /// <summary>All ants that are or were once on the map.</summary>
     property Ants: TAnts.TReader read GetAnts;
+    /// <summary>All currently moving ants on the map.</summary>
+    property ActiveAnts: TAnts.TReader read GetActiveAnts;
 
-    /// <summary>Spawns in a single ant at the start.</summary>
-    function SpawnAnt: TAnt;
-    /// <summary>Spawns in multiple ants at the start.</summary>
+    /// <summary>Spawns in a single active ant at the start.</summary>
+    function SpawnAnt: TMovingAnt;
+    /// <summary>Spawns in group of active ants at the start.</summary>
     procedure SpawnAnts(ACount: Integer);
 
-    /// <summary>Removed all ants from the map.</summary>
+    /// <summary>Removes all ants from the map.</summary>
     procedure ClearAnts;
+    /// <summary>Removes all pheoromone trails from the map.</summary>
+    procedure ClearTrails;
 
     /// <summary>How much the ant moves to every call of the Step method.</summary>
     property AntSpeed: Single read FAntSpeed write FAntSpeed;
@@ -143,23 +155,37 @@ type
     property PheromoneDissipation: Single read FPheromoneDissipation write FPheromoneDissipation;
     /// <summary>How many pheromones newly created ants leave behind after passing a connection.</summary>
     property PheromoneTrail: Single read FPheromoneTrail write FPheromoneTrail;
+    property InfluencedFactor: Single read FInfluencedFactor write FInfluencedFactor;
 
     /// <summary>Runs a single timestep, meaning pheromone dissipation and ant movement including pheromone trails.</summary>
-    procedure Step;
+    procedure Step(ADeltaTime: Single);
 
   end;
 
-  TAnt = class
+  TMovingAnt = class
+  public type
+
+    TState = (stActive, stFinished, stStuck, stKilled);
+
+    TInactiveState = stFinished .. stKilled;
+
+    TPath = TRefArray<TPheromoneMap.TPoint>;
+
   private
     FPheromoneMap: TPheromoneMap;
     FPosition: TPheromoneMap.TPosition;
-    FLastConnection: TPheromoneMap.TConnection;
     FSpeed: Single;
     FInfluencedFactor: Single;
     FPheromoneTrail: Single;
+    FState: TState;
+    FPath: TPath;
 
     /// <summary>Evaluates the best next direction for the ant.</summary>
     procedure EnsurePositionFinish;
+
+    /// <summary>Deactives the ant for a given reason.</summary>
+    procedure Deactivate(ANewState: TInactiveState);
+    function GetPath: TPath.TReader;
 
   public
     constructor Create(APheromoneMap: TPheromoneMap);
@@ -176,9 +202,19 @@ type
     /// <summary>How many pheromones the ant leaves behind after passing a connection.</summary>
     property PheromoneTrail: Single read FPheromoneTrail write FPheromoneTrail;
 
+    /// <summary>The full path of points, that this ant took.</summary>
+    property Path: TPath.TReader read GetPath;
+
     /// <summary>Moves the ant by the given amount.</summary>
     /// <remarks>The amount is actually multiplied with the speed of the ant first.</remarks>
     procedure Step(AAmount: Single);
+
+    /// <summary>Whether this ant is still being processed by the PheromoneMap.</summary>
+    function Active: Boolean;
+    /// <summary>The state of the ant, being active, finished, stuck or killed.</summary>
+    property State: TState read FState;
+    /// <summary>Sets the state of the ant to being killed.</summary>
+    procedure Kill;
 
   end;
 
@@ -188,7 +224,7 @@ type
     TBatch = class
     public type
 
-      TAnts = TRefArray<TAnt>;
+      TAnts = TRefArray<TMovingAnt>;
 
     private
       FPheromoneMap: TPheromoneMap;
@@ -225,7 +261,11 @@ type
 
     function GenerateBatch: TBatch;
 
-    procedure Step;
+    /// <summary>Steps the PheromoneMap and spawns in new ants as necessary.</summary>
+    procedure Step(ADeltaTime: Single);
+
+    /// <summary>Removes all ants and resets the rest of the simulation.</summary>
+    procedure Clear;
 
   end;
 
@@ -233,25 +273,42 @@ implementation
 
 { TAnt }
 
-constructor TAnt.Create(APheromoneMap: TPheromoneMap);
+function TMovingAnt.Active: Boolean;
+begin
+  Result := State = stActive;
+end;
+
+constructor TMovingAnt.Create(APheromoneMap: TPheromoneMap);
 begin
   FPheromoneMap := APheromoneMap;
   FPosition := TPheromoneMap.TPosition.Create;
   Position.Start := PheromoneMap.StartPoint;
+  FPath := TPath.Create;
+  FPath.Add(Position.Start);
   Speed := 1.0;
-  InfluencedFactor := 0.5;
-  PheromoneTrail := 0.1;
+  InfluencedFactor := PheromoneMap.InfluencedFactor;
+  PheromoneTrail := PheromoneMap.PheromoneTrail;
 end;
 
-destructor TAnt.Destroy;
+procedure TMovingAnt.Deactivate(ANewState: TInactiveState);
 begin
+  FState := ANewState;
+end;
+
+destructor TMovingAnt.Destroy;
+begin
+  FPath.Free;
   FPosition.Free;
   if PheromoneMap <> nil then
+  begin
     PheromoneMap.FAnts.Remove(Self);
+    if Active then
+      PheromoneMap.FActiveAnts.Remove(Self);
+  end;
   inherited;
 end;
 
-procedure TAnt.EnsurePositionFinish;
+procedure TMovingAnt.EnsurePositionFinish;
 
   function InfluencePheromones(APheromones: Single): Single;
   begin
@@ -266,6 +323,8 @@ var
   Connection: TPheromoneMap.TConnection;
   TotalPheromones: Single;
   ConnectionIndex: Integer;
+  Point: TPheromoneMap.TPoint;
+  I: Integer;
 begin
   if Position.Connection <> nil then
     Exit;
@@ -274,47 +333,100 @@ begin
   Connections := TPheromoneMap.TConnections.Create;
   for Connection in Position.Start.Connections do
   begin
-    if Connection <> FLastConnection then
+    if not Path.Contains(Connection.Other(Position.Start)) then
     begin
       Connections.Add(Connection);
       TotalPheromones := TotalPheromones + InfluencePheromones(Connection.Pheromones);
     end;
   end;
-  Connections.Sort(
-    function(A, B: TPheromoneMap.TConnection): Boolean
-    begin
-      Result := A.Pheromones > B.Pheromones;
-    end
-    );
 
-  TotalPheromones := Random * TotalPheromones;
-  ConnectionIndex := 0;
-  while ConnectionIndex < Connections.MaxIndex do
+  if not Connections.Empty then
   begin
-    TotalPheromones := TotalPheromones - InfluencePheromones(Connections[ConnectionIndex].Pheromones);
-    if TotalPheromones <= 0 then
-      Break;
-    Inc(ConnectionIndex);
+    ConnectionIndex := 0;
+    if Connections.Count > 1 then
+    begin
+      Connections.Shuffle;
+
+      Connections.Sort(
+        function(A, B: TPheromoneMap.TConnection): Boolean
+        begin
+          Result := A.Pheromones > B.Pheromones;
+        end
+        );
+
+      TotalPheromones := Random * TotalPheromones;
+      while ConnectionIndex < Connections.MaxIndex do
+      begin
+        TotalPheromones := TotalPheromones - InfluencePheromones(Connections[ConnectionIndex].Pheromones);
+        if TotalPheromones <= 0 then
+          Break;
+        Inc(ConnectionIndex);
+      end;
+    end;
+
+    FPath.Add(Connections[ConnectionIndex].Other(Position.Start));
+    Position.StartMovement(Connections[ConnectionIndex]);
+    // Connections[ConnectionIndex].LeaveTrail(PheromoneTrail);
+
+  end
+  else
+  begin
+    Deactivate(stStuck);
+    {
+      for I := 0 to Path.MaxIndex - 1 do
+      begin
+      Connection := Path[I].ConnectionTo(Path[I + 1]);
+      Connection.Pheromones := Connection.Pheromones * 0.5;
+      end;
+    }
+
+    {
+      ConnectionIndex := Random(Position.Start.Connections.Count);
+      FPath.Add(Position.Start.Connections[ConnectionIndex].Other(Position.Start));
+      Position.StartMovement(Position.Start.Connections[ConnectionIndex]);
+      Position.Start.Connections[ConnectionIndex].LeaveTrail(PheromoneTrail);
+    }
   end;
-  Position.StartMovement(Connections[ConnectionIndex]);
 
   Connections.Free;
 end;
 
-procedure TAnt.Step(AAmount: Single);
+function TMovingAnt.GetPath: TPath.TReader;
+begin
+  Result := FPath.Reader;
+end;
+
+procedure TMovingAnt.Kill;
+begin
+  Deactivate(stKilled);
+end;
+
+procedure TMovingAnt.Step(AAmount: Single);
 var
   CurrentProgress: Single;
+  I: Integer;
 begin
+  Assert(Active, 'Cannot step inactive ant.');
   AAmount := AAmount * Speed;
   while AAmount > 0 do
   begin
     EnsurePositionFinish;
 
+    if not Active then
+      Break;
+
     CurrentProgress := AAmount / Position.Connection.Cost;
     if Position.Progress + CurrentProgress >= 1 then
     begin
-      AAmount := AAmount - CurrentProgress;
+      AAmount := AAmount - Position.Connection.Cost * (1 - Position.Progress);
       Position.Start := Position.Finish;
+      if Position.Start.IsFinish then
+      begin
+        Deactivate(stFinished);
+        for I := 0 to Path.MaxIndex - 1 do
+          Path[I].ConnectionTo(Path[I + 1]).LeaveTrail(PheromoneTrail);
+        Break;
+      end;
     end
     else
     begin
@@ -328,12 +440,21 @@ end;
 
 procedure TPheromoneMap.ClearAnts;
 var
-  Ant: TAnt;
+  Ant: TMovingAnt;
 begin
   for Ant in FAnts do
     Ant.FPheromoneMap := nil;
   FAnts.OwnsObjects := True;
   FAnts.Clear;
+  FActiveAnts.Clear;
+end;
+
+procedure TPheromoneMap.ClearTrails;
+var
+  Connection: TConnection;
+begin
+  for Connection in Connections do
+    Connection.Pheromones := 0;
 end;
 
 constructor TPheromoneMap.Create(AGraph: TGraph);
@@ -362,8 +483,12 @@ begin
     FFinishPoint := Points[AGraph.FinishPoint.Index];
 
   FAnts := TAnts.Create;
+  FActiveAnts := TAnts.Create;
+
   FAntSpeed := 1;
   FPheromoneDissipation := 0.5;
+  FPheromoneTrail := 1.0;
+  FInfluencedFactor := 0.9;
 
   FValid := (StartPoint <> nil) and (FinishPoint <> nil);
 end;
@@ -372,9 +497,15 @@ destructor TPheromoneMap.Destroy;
 begin
   ClearAnts;
   FAnts.Free;
+  FActiveAnts.Free;
   FPoints.Free;
   FConnections.Free;
   inherited;
+end;
+
+function TPheromoneMap.GetActiveAnts: TAnts.TReader;
+begin
+  Result := FActiveAnts.Reader;
 end;
 
 function TPheromoneMap.GetAnts: TAnts.TReader;
@@ -392,11 +523,11 @@ begin
   Result := FPoints.Reader;
 end;
 
-function TPheromoneMap.SpawnAnt: TAnt;
+function TPheromoneMap.SpawnAnt: TMovingAnt;
 begin
-  Result := TAnt.Create(Self);
-  Result.PheromoneTrail := PheromoneTrail;
+  Result := TMovingAnt.Create(Self);
   FAnts.Add(Result);
+  FActiveAnts.Add(Result);
 end;
 
 procedure TPheromoneMap.SpawnAnts(ACount: Integer);
@@ -407,15 +538,19 @@ begin
     SpawnAnt;
 end;
 
-procedure TPheromoneMap.Step;
+procedure TPheromoneMap.Step(ADeltaTime: Single);
 var
   Connection: TConnection;
-  Ant: TAnt;
+  I: Integer;
 begin
   for Connection in Connections do
-    Connection.DissipatePheromones(PheromoneDissipation);
-  for Ant in Ants do
-    Ant.Step(AntSpeed);
+    Connection.Pheromones := Connection.Pheromones * Power(1 - PheromoneDissipation, ADeltaTime);
+  for I := ActiveAnts.MaxIndex downto 0 do
+  begin
+    ActiveAnts[I].Step(AntSpeed * ADeltaTime);
+    if not ActiveAnts[I].Active then
+      FActiveAnts.RemoveAt(I);
+  end;
 end;
 
 { TPheromoneMap.TPosition }
@@ -471,10 +606,10 @@ begin
   FCost := ACostFactor * APointA.Pos.DistanceTo(APointB.Pos);
 end;
 
-procedure TPheromoneMap.TConnection.DissipatePheromones(APercentage: Single);
-begin
-  Pheromones := Pheromones * (1 - APercentage)
-end;
+// procedure TPheromoneMap.TConnection.DissipatePheromones(APercentage: Single);
+// begin
+// Pheromones := Pheromones * (1 - APercentage)
+// end;
 
 procedure TPheromoneMap.TConnection.LeaveTrail(AAmount: Single);
 begin
@@ -495,6 +630,14 @@ end;
 
 { TPheromoneMap.TPoint }
 
+function TPheromoneMap.TPoint.ConnectionTo(APoint: TPoint): TConnection;
+begin
+  for Result in Connections do
+    if Result.Other(Self) = APoint then
+      Exit;
+  Result := nil;
+end;
+
 constructor TPheromoneMap.TPoint.Create(APheromoneMap: TPheromoneMap; APos: TVector2);
 begin
   FPheromoneMap := APheromoneMap;
@@ -511,6 +654,16 @@ end;
 function TPheromoneMap.TPoint.GetConnections: TConnections.TReader;
 begin
   Result := FConnections.Reader;
+end;
+
+function TPheromoneMap.TPoint.IsFinish: Boolean;
+begin
+  Result := PheromoneMap.FinishPoint = Self;
+end;
+
+function TPheromoneMap.TPoint.IsStart: Boolean;
+begin
+  Result := PheromoneMap.StartPoint = Self;
 end;
 
 { TSimulation }
@@ -540,17 +693,31 @@ begin
   Result := FBatches.Reader;
 end;
 
-procedure TSimulation.Step;
+procedure TSimulation.Clear;
+begin
+  PheromoneMap.ClearAnts;
+  PheromoneMap.ClearTrails;
+  FBatches.Clear;
+  FBatchTimeout := 0;
+end;
+
+procedure TSimulation.Step(ADeltaTime: Single);
 begin
   if not PheromoneMap.Valid then
     raise Exception.Create('Graph is not valid');
-  FBatchTimeout := FBatchTimeout - PheromoneMap.AntSpeed;
+
+  FBatchTimeout := FBatchTimeout - ADeltaTime;
   while FBatchTimeout <= 0 do
   begin
     GenerateBatch;
-    FBatchTimeout := FBatchTimeout + FBatchInterval;
+    FBatchTimeout := FBatchTimeout + BatchInterval;
+    if ADeltaTime > BatchInterval then
+    begin
+      PheromoneMap.Step(FBatchInterval);
+      ADeltaTime := ADeltaTime - BatchInterval;
+    end;
   end;
-  PheromoneMap.Step;
+  PheromoneMap.Step(ADeltaTime);
 end;
 
 { TSimulation.TBatch }
