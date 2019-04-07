@@ -104,8 +104,8 @@ type
     procedure Paint(G: IGPGraphics); virtual;
     procedure Drag(AAmount: TVector2); virtual;
     procedure Hover(APos: TVector2); virtual;
-    procedure MouseDown(APos: TVector2); virtual;
-    procedure MouseUp(APos: TVector2); virtual;
+    procedure MouseDown(APos: TVector2; AButton: TMouseButton); virtual;
+    procedure MouseUp(APos: TVector2; AButton: TMouseButton); virtual;
     procedure MouseLeave; virtual;
 
   public
@@ -138,6 +138,7 @@ type
     FPointAtCursor: TGraph.TPoint;
     FConnectionAtCursor: TGraph.TConnection;
     FConnectionStart: TGraph.TPoint;
+    FConnectionDrag: TVector2;
     FOnToolChange: TEvent;
 
     procedure SetTool(const Value: TEditorTool);
@@ -149,8 +150,8 @@ type
     procedure Paint(G: IGPGraphics); override;
     procedure Drag(AAmount: TVector2); override;
     procedure Hover(APos: TVector2); override;
-    procedure MouseDown(APos: TVector2); override;
-    procedure MouseUp(APos: TVector2); override;
+    procedure MouseDown(APos: TVector2; AButton: TMouseButton); override;
+    procedure MouseUp(APos: TVector2; AButton: TMouseButton); override;
     procedure MouseLeave; override;
 
   public
@@ -262,7 +263,7 @@ begin
   // nothing
 end;
 
-procedure TDisplay.MouseDown(APos: TVector2);
+procedure TDisplay.MouseDown(APos: TVector2; AButton: TMouseButton);
 begin
   // nothing
 end;
@@ -272,7 +273,7 @@ begin
   // nothing
 end;
 
-procedure TDisplay.MouseUp(APos: TVector2);
+procedure TDisplay.MouseUp(APos: TVector2; AButton: TMouseButton);
 begin
   // nothing
 end;
@@ -312,8 +313,8 @@ end;
 
 procedure TDisplay.MouseWheel(Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint);
 begin
-  if ssCtrl in Shift then
-    Camera.Zoom(1 + WheelDelta / WHEEL_DELTA * 0.1, Vec2(MousePos.X, MousePos.Y) - TVector2(PaintBoxSize) / 2);
+  // if ssCtrl in Shift then
+  Camera.Zoom(1 + WheelDelta / WHEEL_DELTA * 0.1, Vec2(MousePos.X, MousePos.Y) - TVector2(PaintBoxSize) / 2);
 end;
 
 { TEditorDisplay }
@@ -333,7 +334,9 @@ end;
 
 procedure TEditorDisplay.Drag(AAmount: TVector2);
 begin
-  if FPointAtCursor <> nil then
+  if Tool = etConnection then
+    FConnectionDrag := FConnectionDrag + AAmount
+  else if FPointAtCursor <> nil then
     FPointAtCursor.Pos := FPointAtCursor.Pos + AAmount / FCamera.Scale
   else
     inherited;
@@ -379,24 +382,44 @@ begin
     PaintBox.Invalidate;
 end;
 
-procedure TEditorDisplay.MouseDown(APos: TVector2);
+procedure TEditorDisplay.MouseDown(APos: TVector2; AButton: TMouseButton);
 begin
   case Tool of
     etPoint:
-      FGraph.AddPoint(APos);
-    etConnection:
-      FConnectionStart := FPointAtCursor;
-    etStart:
-      if FPointAtCursor <> nil then
+      if AButton = mbLeft then
       begin
-        FPointAtCursor.IsStart := True;
-        Tool := etSelection;
+        FGraph.AddPoint(APos);
+        FCamDrag.Clear;
+        PaintBox.Invalidate;
+      end;
+    etConnection:
+      if AButton = mbLeft then
+      begin
+        FConnectionStart := FPointAtCursor;
+        FConnectionDrag := APos;
+        PaintBox.Invalidate;
+      end;
+    etStart:
+      if AButton = mbLeft then
+      begin
+        if FPointAtCursor <> nil then
+        begin
+          FPointAtCursor.IsStart := True;
+          Tool := etSelection;
+          FCamDrag.Clear;
+          PaintBox.Invalidate;
+        end;
       end;
     etFinish:
-      if FPointAtCursor <> nil then
+      if AButton = mbLeft then
       begin
-        FPointAtCursor.IsFinish := True;
-        Tool := etSelection;
+        if FPointAtCursor <> nil then
+        begin
+          FPointAtCursor.IsFinish := True;
+          Tool := etSelection;
+          FCamDrag.Clear;
+          PaintBox.Invalidate;
+        end;
       end;
   end;
 end;
@@ -408,9 +431,12 @@ begin
   PaintBox.Invalidate;
 end;
 
-procedure TEditorDisplay.MouseUp(APos: TVector2);
+procedure TEditorDisplay.MouseUp(APos: TVector2; AButton: TMouseButton);
 begin
+  if (FConnectionStart <> nil) and (FPointAtCursor <> nil) then
+    FConnectionStart.Connect(FPointAtCursor);
   FConnectionStart := nil;
+  PaintBox.Invalidate;
 end;
 
 procedure TEditorDisplay.Paint(G: IGPGraphics);
@@ -478,7 +504,7 @@ begin
   begin
     G.DrawLine(TGPPen.Create(TGPColor.Blue, LineWidth / 2),
       FConnectionStart.Pos.X, FConnectionStart.Pos.Y,
-      FCamDrag.Value.X, FCamDrag.Value.Y);
+      FConnectionDrag.X, FConnectionDrag.Y);
   end;
 
 end;
@@ -491,7 +517,7 @@ end;
 procedure TDisplay.PaintBoxMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
   FCamDrag := Vec2(X, Y);
-  MouseDown(CursorToGraph(FCamDrag));
+  MouseDown(CursorToGraph(FCamDrag), Button);
 end;
 
 procedure TDisplay.PaintBoxMouseLeave(Sender: TObject);
@@ -509,7 +535,7 @@ end;
 
 procedure TDisplay.PaintBoxMouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
 begin
-  MouseUp(CursorToGraph(Vec2(X, Y)));
+  MouseUp(CursorToGraph(Vec2(X, Y)), Button);
   FCamDrag.Clear;
 end;
 
@@ -694,17 +720,18 @@ begin
   begin
     for Connection in FAnt.Path do
       with Connection do
-        G.DrawLine(TGPPen.Create(TGPColor.Blue, LineWidth * 1.5), PointA.Pos.X, PointA.Pos.Y, PointB.Pos.X, PointB.Pos.Y);
+        G.DrawLine(TGPPen.Create(TGPColor.Blue, LineWidth * 1.5), PointA.Pos.X, PointA.Pos.Y, PointB.Pos.X,
+          PointB.Pos.Y);
   end;
 
   {
-  Brush := TGPSolidBrush.Create(TGPColor.Create(128, 0, 0, 0));
-  for Ant in PheromoneMap.ActiveAnts do
-  begin
+    Brush := TGPSolidBrush.Create(TGPColor.Create(128, 0, 0, 0));
+    for Ant in PheromoneMap.ActiveAnts do
+    begin
     Rect.Initialize(Ant.Position.VisualPos.X, Ant.Position.VisualPos.Y, 0, 0);
     Rect.Inflate(LineWidth);
     G.FillEllipse(Brush, Rect);
-  end;
+    end;
   }
 end;
 
