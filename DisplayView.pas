@@ -168,6 +168,7 @@ type
   TSimulationDisplay = class(TDisplay)
   private
     FPheromoneMap: TPheromoneMap;
+    FAnt: TAnt;
 
   protected
     procedure Paint(G: IGPGraphics); override;
@@ -177,6 +178,9 @@ type
     destructor Destroy; override;
 
     property PheromoneMap: TPheromoneMap read FPheromoneMap;
+
+    procedure ShowAntPath(AAnt: TAnt);
+    procedure HideAntPath;
 
   end;
 
@@ -634,16 +638,22 @@ begin
   inherited;
 end;
 
+procedure TSimulationDisplay.HideAntPath;
+begin
+  FAnt := nil;
+  PaintBox.Invalidate;
+end;
+
 procedure TSimulationDisplay.Paint(G: IGPGraphics);
 var
   Connection: TPheromoneMap.TConnection;
   Point: TPheromoneMap.TPoint;
-  Ant: TMovingAnt;
   ColorRGB: TColorRGBA;
   Color: TGPColor;
   Brush, StartFinishBrush: IGPBrush;
   Rect: TGPRectF;
   MaxPheromones: Single;
+  Pen: IGPPen;
 begin
   MaxPheromones := 0;
   for Connection in PheromoneMap.Connections do
@@ -680,6 +690,14 @@ begin
     end;
   end;
 
+  if FAnt <> nil then
+  begin
+    for Connection in FAnt.Path do
+      with Connection do
+        G.DrawLine(TGPPen.Create(TGPColor.Blue, LineWidth * 1.5), PointA.Pos.X, PointA.Pos.Y, PointB.Pos.X, PointB.Pos.Y);
+  end;
+
+  {
   Brush := TGPSolidBrush.Create(TGPColor.Create(128, 0, 0, 0));
   for Ant in PheromoneMap.ActiveAnts do
   begin
@@ -687,6 +705,13 @@ begin
     Rect.Inflate(LineWidth);
     G.FillEllipse(Brush, Rect);
   end;
+  }
+end;
+
+procedure TSimulationDisplay.ShowAntPath(AAnt: TAnt);
+begin
+  FAnt := AAnt;
+  PaintBox.Invalidate;
 end;
 
 end.

@@ -13,8 +13,10 @@ uses
   System.IOUtils,
   System.ImageList,
   System.Types,
+  System.Math,
 
   Vcl.ComCtrls,
+  Vcl.Dialogs,
   Vcl.ToolWin,
   Vcl.ExtCtrls,
   Vcl.ActnList,
@@ -27,13 +29,13 @@ uses
 
   Pengine.Vector,
   Pengine.Utility,
+  Pengine.JSON,
+  Pengine.Collections,
 
   DisplayView,
   GraphDefine,
   MiniDialogGenerateGrid,
-  AntDefine,
-  Pengine.JSON,
-  Vcl.Dialogs;
+  AntDefine;
 
 type
 
@@ -90,30 +92,20 @@ type
     StartWerkzeug1: TMenuItem;
     actFinishTool1: TMenuItem;
     N6: TMenuItem;
-    actSingleStep: TAction;
+    actGenerate: TAction;
     actStart: TAction;
-    lbBatchInterval: TLabel;
-    edtBatchInterval: TEdit;
-    lbBatchIntervalUnit: TLabel;
     lbBatchSize: TLabel;
     seBatchSize: TSpinEdit;
     lbPheromoneDissipation: TLabel;
     edtPheromoneDissipation: TEdit;
-    lbPheromoneTrail: TLabel;
-    edtPheromoneTrail: TEdit;
     lbPheromoneDissipationUnit: TLabel;
-    lbStepSize: TLabel;
     gbPopulation: TGroupBox;
     seBatch: TSpinEdit;
     lbBatch: TLabel;
-    lbPopulation: TListBox;
     lbTodoBatchStatistics: TLabel;
-    lbTodoAntData: TLabel;
-    edtStepSize: TEdit;
     gbStatistics: TGroupBox;
     lbTodoChart: TLabel;
     splStatistics: TSplitter;
-    lbStepSizeUnit: TLabel;
     dlgSave: TSaveDialog;
     dlgOpen: TOpenDialog;
     tmrUpdate: TTimer;
@@ -121,7 +113,11 @@ type
     gbControl: TGroupBox;
     btnReset: TButton;
     btnStart: TButton;
-    btnSingleStep: TButton;
+    btnGenerate: TButton;
+    Label1: TLabel;
+    edtInfluenceFactor: TEdit;
+    Label2: TLabel;
+    lvAnts: TListView;
     procedure actClearExecute(Sender: TObject);
     procedure actConnectionToolExecute(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -136,23 +132,27 @@ type
     procedure actResetExecute(Sender: TObject);
     procedure actResetViewExecute(Sender: TObject);
     procedure actSaveAsExecute(Sender: TObject);
-    procedure actSingleStepExecute(Sender: TObject);
-    procedure actSingleStepUpdate(Sender: TObject);
+    procedure actGenerateExecute(Sender: TObject);
+    procedure actGenerateUpdate(Sender: TObject);
     procedure actStartExecute(Sender: TObject);
     procedure actStartToolExecute(Sender: TObject);
     procedure actStartUpdate(Sender: TObject);
-    procedure edtBatchIntervalExit(Sender: TObject);
-    procedure edtPheromoneTrailExit(Sender: TObject);
+    procedure edtInfluenceFactorExit(Sender: TObject);
     procedure edtPheromoneDissipationExit(Sender: TObject);
-    procedure edtStepSizeExit(Sender: TObject);
     procedure FormMouseWheel(Sender: TObject; Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint;
       var Handled: Boolean);
+    procedure lvAntsColumnClick(Sender: TObject; Column: TListColumn);
+    procedure lvAntsCompare(Sender: TObject; Item1, Item2: TListItem; Data:
+      Integer; var Compare: Integer);
+    procedure lvAntsSelectItem(Sender: TObject; Item: TListItem; Selected: Boolean);
+    procedure seBatchChange(Sender: TObject);
     procedure seBatchSizeExit(Sender: TObject);
     procedure tmrUpdateTimer(Sender: TObject);
   private
     FBackupGraph: TGraph;
     FDisplay: TDisplay;
     FSimulation: TSimulation;
+    FSortColumn: Integer;
 
     procedure DisplayToolChange;
     function GetEditorDisplay: TEditorDisplay;
@@ -161,6 +161,8 @@ type
     procedure SetEditable(const Value: Boolean);
     function GetPheromoneMap: TPheromoneMap;
     procedure SyncSimulationData;
+
+    procedure GenerateAntList;
 
   public
     property EditorDisplay: TEditorDisplay read GetEditorDisplay;
@@ -300,15 +302,19 @@ begin
   end;
 end;
 
-procedure TfrmMain.actSingleStepExecute(Sender: TObject);
+procedure TfrmMain.actGenerateExecute(Sender: TObject);
 begin
-  FSimulation.Step(1);
+  FSimulation.GenerateBatch;
+  seBatch.MaxValue := FSimulation.Batches.Count;
+  seBatch.Value := FSimulation.Batches.Count;
+  seBatch.Enabled := FSimulation.Batches.Count > 1;
+  GenerateAntList;
   pbDisplay.Invalidate;
 end;
 
-procedure TfrmMain.actSingleStepUpdate(Sender: TObject);
+procedure TfrmMain.actGenerateUpdate(Sender: TObject);
 begin
-  actSingleStep.Enabled := PheromoneMap.Valid;
+  actGenerate.Enabled := PheromoneMap.Valid;
 end;
 
 procedure TfrmMain.actStartExecute(Sender: TObject);
@@ -341,28 +347,15 @@ begin
   actFinishTool.Checked := EditorDisplay.Tool = etFinish;
 end;
 
-procedure TfrmMain.edtBatchIntervalExit(Sender: TObject);
+procedure TfrmMain.edtInfluenceFactorExit(Sender: TObject);
 var
   Value: Single;
 begin
   if FSimulation = nil then
     Exit;
-  if Single.TryParse(edtBatchInterval.Text, Value, TFormatSettings.Invariant) then
-    FSimulation.BatchInterval := Value
-  else
-    edtBatchInterval.Text := PrettyFloat(FSimulation.BatchInterval);
-end;
-
-procedure TfrmMain.edtPheromoneTrailExit(Sender: TObject);
-var
-  Value: Single;
-begin
-  if FSimulation = nil then
-    Exit;
-  if Single.TryParse(edtPheromoneTrail.Text, Value, TFormatSettings.Invariant) then
-    PheromoneMap.PheromoneTrail := Value
-  else
-    edtPheromoneTrail.Text := PrettyFloat(PheromoneMap.PheromoneTrail);
+  if Single.TryParse(edtInfluenceFactor.Text, Value, TFormatSettings.Invariant) then
+    PheromoneMap.InfluencedFactor := EnsureRange(Value / 100, 0, 1);
+  edtInfluenceFactor.Text := PrettyFloat(Single(PheromoneMap.InfluencedFactor * 100));
 end;
 
 procedure TfrmMain.edtPheromoneDissipationExit(Sender: TObject);
@@ -372,21 +365,8 @@ begin
   if FSimulation = nil then
     Exit;
   if Single.TryParse(edtPheromoneDissipation.Text, Value, TFormatSettings.Invariant) then
-    PheromoneMap.PheromoneDissipation := Value / 100
-  else
-    edtPheromoneDissipation.Text := PrettyFloat(Single(PheromoneMap.PheromoneDissipation * 100));
-end;
-
-procedure TfrmMain.edtStepSizeExit(Sender: TObject);
-var
-  Value: Single;
-begin
-  if FSimulation = nil then
-    Exit;
-  if Single.TryParse(edtStepSize.Text, Value, TFormatSettings.Invariant) then
-    PheromoneMap.AntSpeed := Value
-  else
-    edtStepSize.Text := PrettyFloat(PheromoneMap.AntSpeed);
+    PheromoneMap.PheromoneDissipation := EnsureRange(Value / 100, 0, 1);
+  edtPheromoneDissipation.Text := PrettyFloat(Single(PheromoneMap.PheromoneDissipation * 100));
 end;
 
 procedure TfrmMain.FormMouseWheel(Sender: TObject; Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint;
@@ -397,6 +377,37 @@ begin
   begin
     FDisplay.MouseWheel(Shift, WheelDelta, MousePos);
     Handled := True;
+  end;
+end;
+
+procedure TfrmMain.GenerateAntList;
+var
+  Batch: TSimulation.TBatch;
+  I: Integer;
+  Item: TListItem;
+begin
+  lvAnts.Items.BeginUpdate;
+  try
+    lvAnts.Items.Clear;
+
+    if FSimulation = nil then
+      Exit;
+
+    Batch := FSimulation.Batches[seBatch.Value - 1];
+    for I := 0 to Batch.Ants.MaxIndex do
+    begin
+      Item := lvAnts.Items.Add;
+      Item.Caption := (I + 1).ToString;
+      Item.Data := Batch.Ants[I];
+      if Batch.Ants[I].Success then
+        Item.SubItems.Add(PrettyFloat(Batch.Ants[I].PathLength))
+      else
+        Item.SubItems.Add('failed');
+    end;
+
+  finally
+    lvAnts.Items.EndUpdate;
+
   end;
 end;
 
@@ -417,16 +428,58 @@ end;
 
 procedure TfrmMain.SyncSimulationData;
 begin
-  edtBatchIntervalExit(nil);
   seBatchSizeExit(nil);
+  edtInfluenceFactorExit(nil);
   edtPheromoneDissipationExit(nil);
-  edtPheromoneTrailExit(nil);
-  edtStepSizeExit(nil);
 end;
 
 function TfrmMain.GetSimulationDisplay: TSimulationDisplay;
 begin
   Result := FDisplay as TSimulationDisplay;
+end;
+
+procedure TfrmMain.lvAntsColumnClick(Sender: TObject; Column: TListColumn);
+begin
+  if FSortColumn = Column.Index + 1 then
+    FSortColumn := -FSortColumn
+  else
+    FSortColumn := Column.Index + 1;
+  lvAnts.AlphaSort;
+end;
+
+procedure TfrmMain.lvAntsCompare(Sender: TObject; Item1, Item2: TListItem;
+  Data: Integer; var Compare: Integer);
+var
+  Ant1, Ant2: TAnt;
+begin
+  Ant1 := Item1.Data;
+  Ant2 := Item2.Data;
+  case Abs(FSortColumn) of
+    1:
+      Compare := CompareValue(Item1.Caption.ToInteger, Item2.Caption.ToInteger);
+    2:
+      if not Ant1.Success or not Ant2.Success then
+        Compare := IfThen(Ant1.Success, -1, 1)
+      else
+        Compare := CompareValue(Ant1.PathLength, Ant2.PathLength);
+  end;
+  Compare := Compare * Sign(FSortColumn);
+end;
+
+procedure TfrmMain.lvAntsSelectItem(Sender: TObject; Item: TListItem; Selected: Boolean);
+var
+  Ant: TAnt;
+begin
+  Ant := Item.Data;
+  if Selected then
+    SimulationDisplay.ShowAntPath(Ant)
+  else
+    SimulationDisplay.HideAntPath;
+end;
+
+procedure TfrmMain.seBatchChange(Sender: TObject);
+begin
+  GenerateAntList;
 end;
 
 procedure TfrmMain.seBatchSizeExit(Sender: TObject);
@@ -505,7 +558,7 @@ begin
     Exit;
   end;
 
-  FSimulation.Step(tmrUpdate.Interval / MSecsPerSec);
+  FSimulation.GenerateBatch;
   pbDisplay.Invalidate;
 end;
 

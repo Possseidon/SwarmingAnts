@@ -165,124 +165,82 @@ object frmMain: TfrmMain
       Left = 3
       Top = 3
       Width = 227
-      Height = 166
+      Height = 110
       Align = alTop
-      Caption = 'Simulation'
+      Caption = 'Einstellungen'
       TabOrder = 0
-      object lbBatchInterval: TLabel
-        Left = 16
-        Top = 28
-        Width = 74
-        Height = 13
-        Caption = 'Batch Intervall:'
-      end
-      object lbBatchIntervalUnit: TLabel
-        Left = 202
-        Top = 28
-        Width = 16
-        Height = 13
-        Caption = 'sec'
-      end
       object lbBatchSize: TLabel
-        Left = 16
-        Top = 55
+        Left = 12
+        Top = 23
         Width = 63
         Height = 13
         Caption = 'Batch Gr'#246#223'e:'
       end
       object lbPheromoneDissipation: TLabel
-        Left = 16
-        Top = 83
-        Width = 78
-        Height = 13
-        Caption = 'Pheromonverfl.:'
-      end
-      object lbPheromoneTrail: TLabel
-        Left = 16
-        Top = 110
+        Left = 12
+        Top = 78
         Width = 73
         Height = 13
-        Caption = 'Pheromonspur:'
+        Caption = 'Verfl'#252'chtigung:'
       end
       object lbPheromoneDissipationUnit: TLabel
         Left = 202
-        Top = 83
-        Width = 20
+        Top = 78
+        Width = 11
         Height = 13
-        Caption = '%/s'
+        Caption = '%'
       end
-      object lbStepSize: TLabel
-        Left = 16
-        Top = 137
-        Width = 63
+      object Label1: TLabel
+        Left = 12
+        Top = 51
+        Width = 70
         Height = 13
-        Caption = 'Schrittgr'#246#223'e:'
+        Caption = 'Beeinflussung:'
       end
-      object lbStepSizeUnit: TLabel
+      object Label2: TLabel
         Left = 202
-        Top = 137
-        Width = 17
+        Top = 51
+        Width = 11
         Height = 13
-        Caption = 'm/s'
-      end
-      object edtBatchInterval: TEdit
-        Left = 112
-        Top = 25
-        Width = 84
-        Height = 21
-        TabOrder = 0
-        OnExit = edtBatchIntervalExit
+        Caption = '%'
       end
       object seBatchSize: TSpinEdit
         Left = 112
-        Top = 52
+        Top = 20
         Width = 103
         Height = 22
         MaxValue = 500
         MinValue = 1
-        TabOrder = 1
-        Value = 1
+        TabOrder = 0
+        Value = 20
         OnExit = seBatchSizeExit
       end
       object edtPheromoneDissipation: TEdit
         Left = 112
-        Top = 80
+        Top = 75
         Width = 84
         Height = 21
         TabOrder = 2
         OnExit = edtPheromoneDissipationExit
       end
-      object edtPheromoneTrail: TEdit
+      object edtInfluenceFactor: TEdit
         Left = 112
-        Top = 107
+        Top = 48
         Width = 84
         Height = 21
-        TabOrder = 3
-        OnExit = edtPheromoneTrailExit
-      end
-      object edtStepSize: TEdit
-        Left = 112
-        Top = 134
-        Width = 84
-        Height = 21
-        TabOrder = 4
-        OnExit = edtStepSizeExit
+        TabOrder = 1
+        OnExit = edtInfluenceFactorExit
       end
     end
     object gbPopulation: TGroupBox
       AlignWithMargins = True
       Left = 3
-      Top = 269
+      Top = 213
       Width = 227
-      Height = 267
+      Height = 323
       Align = alClient
       Caption = 'Population'
       TabOrder = 1
-      ExplicitTop = 237
-      ExplicitHeight = 299
-      DesignSize = (
-        227
-        267)
       object lbBatch: TLabel
         Left = 16
         Top = 27
@@ -292,45 +250,50 @@ object frmMain: TfrmMain
       end
       object lbTodoBatchStatistics: TLabel
         Left = 56
-        Top = 88
+        Top = 64
         Width = 109
         Height = 13
         Caption = 'TODO: Batch Statistics'
-      end
-      object lbTodoAntData: TLabel
-        Left = 56
-        Top = 213
-        Width = 79
-        Height = 13
-        Anchors = [akLeft, akBottom]
-        Caption = 'TODO: Ant Data'
-        ExplicitTop = 272
       end
       object seBatch: TSpinEdit
         Left = 112
         Top = 24
         Width = 103
         Height = 22
-        MaxValue = 0
-        MinValue = 0
+        Enabled = False
+        MaxValue = 1
+        MinValue = 1
         TabOrder = 0
-        Value = 0
+        Value = 1
+        OnChange = seBatchChange
       end
-      object lbPopulation: TListBox
-        Left = 3
-        Top = 142
-        Width = 212
-        Height = 41
-        Anchors = [akLeft, akTop, akBottom]
-        ItemHeight = 13
+      object lvAnts: TListView
+        Left = 12
+        Top = 96
+        Width = 203
+        Height = 209
+        Columns = <
+          item
+            Caption = 'ID'
+            Width = 30
+          end
+          item
+            Caption = 'Pfadl'#228'nge'
+            Width = 80
+          end>
+        ReadOnly = True
+        RowSelect = True
         TabOrder = 1
-        ExplicitHeight = 73
+        ViewStyle = vsReport
+        OnColumnClick = lvAntsColumnClick
+        OnCompare = lvAntsCompare
+        OnSelectItem = lvAntsSelectItem
       end
     end
     object gbControl: TGroupBox
       AlignWithMargins = True
       Left = 3
-      Top = 175
+      Top = 119
       Width = 227
       Height = 88
       Align = alTop
@@ -340,7 +303,7 @@ object frmMain: TfrmMain
         227
         88)
       object btnReset: TButton
-        Left = 10
+        Left = 12
         Top = 23
         Width = 84
         Height = 25
@@ -357,13 +320,14 @@ object frmMain: TfrmMain
         Anchors = [akLeft, akBottom]
         TabOrder = 1
       end
-      object btnSingleStep: TButton
-        Left = 112
+      object btnGenerate: TButton
+        Left = 16
         Top = 54
-        Width = 84
+        Width = 199
         Height = 25
-        Action = actSingleStep
+        Action = actGenerate
         Anchors = [akLeft, akBottom]
+        Caption = 'Generiere Batch'
         TabOrder = 2
       end
     end
@@ -541,11 +505,11 @@ object frmMain: TfrmMain
       ImageIndex = 4
       OnExecute = actFinishToolExecute
     end
-    object actSingleStep: TAction
+    object actGenerate: TAction
       Category = 'Simulation'
-      Caption = 'Einzelschritt'
-      OnExecute = actSingleStepExecute
-      OnUpdate = actSingleStepUpdate
+      Caption = 'Generiere'
+      OnExecute = actGenerateExecute
+      OnUpdate = actGenerateUpdate
     end
     object actStart: TAction
       Category = 'Simulation'
