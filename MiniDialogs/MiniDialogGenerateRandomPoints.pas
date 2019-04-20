@@ -28,13 +28,13 @@ type
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
   private
-    FGraph: TGraph;
+    FGraph: TGraphEditable;
 
   protected
     procedure UpdateActions; override;
 
   public
-    procedure Execute(AGraph: TGraph);
+    procedure Execute(AGraph: TGraphEditable);
 
   end;
 
@@ -47,7 +47,7 @@ implementation
 
 { TForm1 }
 
-procedure TmdlgGenerateRandomPoints.Execute(AGraph: TGraph);
+procedure TmdlgGenerateRandomPoints.Execute(AGraph: TGraphEditable);
 begin
   FGraph := AGraph;
   ModalResult := mrCancel;
@@ -59,7 +59,7 @@ procedure TmdlgGenerateRandomPoints.FormClose(Sender: TObject; var Action: TClos
 begin
   if ModalResult = mrOk then
   begin
-    with TGraph.TRandomPointGenerator.Create(FGraph) do
+    with TGraphEditable.TRandomPointGenerator.Create(FGraph) do
     begin
       try
         Count := seCount.Value;

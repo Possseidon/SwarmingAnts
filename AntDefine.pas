@@ -4,169 +4,70 @@ interface
 
 uses
   System.SysUtils,
+  System.Math,
 
   Pengine.Collections,
   Pengine.Vector,
   Pengine.EventHandling,
+  Pengine.CollectionInterfaces,
+  Pengine.Bitfield,
 
-  GraphDefine,
-  System.Math;
+  GraphDefine;
 
 type
 
   TAnt = class;
 
-  TPheromoneMap = class
-  public type
-
-    TAnts = TRefArray<TAnt>;
-
-    TConnection = class;
-
-    TConnections = TRefArray<TConnection>;
-
-    TPoint = class
-    private
-      FPheromoneMap: TPheromoneMap;
-      FPos: TVector2;
-      FConnections: TConnections;
-      function GetConnections: TConnections.TReader;
-
-    public
-      constructor Create(APheromoneMap: TPheromoneMap; APos: TVector2);
-      destructor Destroy; override;
-
-      property PheromoneMap: TPheromoneMap read FPheromoneMap;
-
-      property Connections: TConnections.TReader read GetConnections;
-
-      function ConnectionTo(APoint: TPoint): TConnection;
-
-      property Pos: TVector2 read FPos;
-      function IsStart: Boolean;
-      function IsFinish: Boolean;
-
-    end;
-
-    TConnection = class
-    private
-      FPheromoneMap: TPheromoneMap;
-      FPointA: TPoint;
-      FPointB: TPoint;
-      FCost: Single;
-      FPheromones: Single;
-
-      procedure SetPheromones(const Value: Single);
-
-    public
-      constructor Create(APheromoneMap: TPheromoneMap; APointA, APointB: TPoint; ACostFactor: Single);
-
-      property PointA: TPoint read FPointA;
-      property PointB: TPoint read FPointB;
-      property Cost: Single read FCost;
-      property Pheromones: Single read FPheromones write SetPheromones;
-
-      function EitherIs(APoint: TPoint): Boolean;
-      
-      /// <summary>Assumes that the point is valid and returns the other point.</summay>
-      function Other(APoint: TPoint): TPoint;
-
-      /// <summary>Dissipates a given percentage of pheromones on this connection.</summary>
-      procedure DissipatePheromones(APercentage: Single);
-
-      /// <summary>Adds a given amount of pheromones on this connection.</summary>
-      procedure LeaveTrail(AAmount: Single);
-
-    end;
-
-    TPoints = TRefArray<TPoint>;
-
-    TPosition = class
-    private
-      FStart: TPoint;
-      FConnection: TConnection;
-      FProgress: Single;
-
-      procedure SetStart(const Value: TPoint);
-      function GetFinish: TPoint;
-      procedure SetProgress(const Value: Single);
-      function GetVisualPos: TVector2;
-
-    public
-      property Start: TPoint read FStart write SetStart;
-      property Connection: TConnection read FConnection;
-      property Finish: TPoint read GetFinish;
-      property Progress: Single read FProgress write SetProgress;
-
-      procedure StartMovement(AStart: TPoint; AConnection: TConnection); overload;
-      procedure StartMovement(AConnection: TConnection); overload;
-
-      property VisualPos: TVector2 read GetVisualPos;
-
-    end;
-
+  TPheromoneData = class
   private
-    FPoints: TPoints;
-    FConnections: TConnections;
-    FStartPoint: TPoint;
-    FFinishPoint: TPoint;
-    FPheromoneDissipation: Single;
-    FInfluencedFactor: Single;
-    FValid: Boolean;
+    FGraph: TGraph;
+    FPheromones: array of Single;
 
-    function GetConnections: TConnections.TReader;
-    function GetPoints: TPoints.TReader;
+    function GetPheromones(AConnection: TGraph.TConnection): Single;
+    procedure SetPheromones(AConnection: TGraph.TConnection; const Value: Single);
 
   public
     constructor Create(AGraph: TGraph);
-    destructor Destroy; override;
 
-    property Valid: Boolean read FValid;
+    function Copy: TPheromoneData;
+    procedure Assign(AFrom: TPheromoneData);
 
-    /// <summary>All points in the graph.</summary>
-    property Points: TPoints.TReader read GetPoints;
-    /// <summary>All connections between points in the graph.</summary>
-    property Connections: TConnections.TReader read GetConnections;
+    property Graph: TGraph read FGraph;
 
-    property StartPoint: TPoint read FStartPoint;
-    property FinishPoint: TPoint read FFinishPoint;
+    property Pheromones[AConnection: TGraph.TConnection]: Single read GetPheromones write SetPheromones; default;
+    procedure Clear;
 
-    /// <summary>Removes all pheoromone trails from the map.</summary>
-    procedure ClearTrails;
+    procedure LeaveTrail(APath: IIterable<TGraph.TConnection>; AAmount: Single);
+    procedure Dissipate(APercentage: Single);
 
-    /// <summary>Percentage of how much pheromone dissipate on every connection every timestep.</summary>
-    property PheromoneDissipation: Single read FPheromoneDissipation write FPheromoneDissipation;
-    /// <summary>How much the ants get influenced by the pheromone trail.</summary>
-    property InfluencedFactor: Single read FInfluencedFactor write FInfluencedFactor;
-
-    /// <summary>Globally dissipates a percentage of the pheromones on each connection.</summary>
-    procedure DissipatePheromones;
-    
   end;
 
   TAnt = class
   public type
 
-    TPath = TRefArray<TPheromoneMap.TConnection>;
+    TPath = TRefArray<TGraph.TConnection>;
 
   private
-    FPheromoneMap: TPheromoneMap;
+    FPheromoneData: TPheromoneData;
+    FPassedPoints: TBitfield;
     FInfluencedFactor: Single;
     FSuccess: Boolean;
     FPath: TPath;
     FPathLength: Single;
 
-    function GetPath: TPath.TReader;
     function GetPheromoneAmount: Single;
 
     /// <summary>Tries to choose a connection.</returns>
-    function ChooseConnection(APoint: TPheromoneMap.TPoint; out AConnection: TPheromoneMap.TConnection): Boolean;
+    function ChooseConnection(APoint: TGraph.TPoint; out AConnection: TGraph.TConnection): Boolean;
+    function GetGraph: TGraph;
+    function GetPath: TPath.TReader;
 
   public
-    constructor Create(APheromoneMap: TPheromoneMap);
+    constructor Create(APheromoneData: TPheromoneData);
     destructor Destroy; override;
 
-    property PheromoneMap: TPheromoneMap read FPheromoneMap;
+    property Graph: TGraph read GetGraph;
+    property PheromoneData: TPheromoneData read FPheromoneData;
 
     /// <summary>How much the ant is influenced by pheromones on the graph.</summary>
     property InfluencedFactor: Single read FInfluencedFactor write FInfluencedFactor;
@@ -174,15 +75,15 @@ type
     /// <summary>The full path of points, that this ant took.</summary>
     property Path: TPath.TReader read GetPath;
     /// <returns>Whether the ant passed over the given point.</returns>
-    function PassedPoint(APoint: TPheromoneMap.TPoint): Boolean;
+    function PassedPoint(APoint: TGraph.TPoint): Boolean;
     /// <summary>The total length of the path.</summary>
     property PathLength: Single read FPathLength;
     /// <summary>An arbitrary value ranging from 0 to 1, depending on how short the path is or zero on failure.</summary>
     property PheromoneAmount: Single read GetPheromoneAmount;
 
-    /// <summary>Simulates the ant to traverse the map.</summary>
+    /// <summary>Simulates the ant to traverse the graph.</summary>
     procedure FindPath;
-    /// <summary>Leaves a trail on the map, depending on how good the ant did and wether the finish was reached at all.</summary>
+    /// <summary>Leaves a trail on the graph, depending on how good the ant did and wether the finish was reached at all.</summary>
     procedure LeaveTrail;
 
     /// <summary>Whether the ant managed to find a finish.</summary>
@@ -193,48 +94,71 @@ type
   TSimulation = class
   public type
 
+    TStatisticType = (
+      stBest,
+      stWorst,
+      stAverage,
+      stMedian
+      );
+
+    TStatistic = array [TStatisticType] of Single;
+
     TBatch = class
     public type
 
       TAnts = TObjectArray<TAnt>;
 
     private
-      FPheromoneMap: TPheromoneMap;
+      FSimulation: TSimulation;
+      FPheromoneData: TPheromoneData;
       FAnts: TAnts;
-      
+
       function GetAnts: TAnts.TReader;
 
     public
-      constructor Create(APheromoneMap: TPheromoneMap; ACount: Integer);
+      constructor Create(ASimulation: TSimulation; ACount: Integer);
       destructor Destroy; override;
 
-      property PheromoneMap: TPheromoneMap read FPheromoneMap write FPheromoneMap;
+      property Simulation: TSimulation read FSimulation;
+      property PheromoneData: TPheromoneData read FPheromoneData;
 
       property Ants: TAnts.TReader read GetAnts;
+
+      function GetPathLengthStatistic: TStatistic;
 
     end;
 
     TBatches = TObjectArray<TBatch>;
 
   private
-    FPheromoneMap: TPheromoneMap;
+    FGraph: TGraph;
+    FInitialPheromoneData: TPheromoneData;
+    FInfluencedFactor: Single;
+    FPheromoneDissipation: Single;
     FBatchSize: Integer;
     FBatches: TBatches;
 
     function GetBatches: TBatches.TReader;
+    function GetPheromoneData: TPheromoneData;
+    function GetGraph: TGraph;
 
   public
-    constructor Create(APheromoneMap: TPheromoneMap);
+    constructor Create(AGraph: TGraph);
     destructor Destroy; override;
 
-    property PheromoneMap: TPheromoneMap read FPheromoneMap;
+    property Graph: TGraph read FGraph;
+    /// <summary>The Pheromone Data of the lastly created Batch.</summary>
+    property PheromoneData: TPheromoneData read GetPheromoneData;
 
     property BatchSize: Integer read FBatchSize write FBatchSize;
     property Batches: TBatches.TReader read GetBatches;
 
     function GenerateBatch: TBatch;
 
-    /// <summary>Removes all ants and resets the rest of the simulation.</summary>
+    property InfluencedFactor: Single read FInfluencedFactor write FInfluencedFactor;
+    property PheromoneDissipation: Single read FPheromoneDissipation write FPheromoneDissipation;
+
+    /// <summary>Removes all Batches.</summary>
     procedure Clear;
 
   end;
@@ -243,20 +167,21 @@ implementation
 
 { TAnt }
 
-constructor TAnt.Create(APheromoneMap: TPheromoneMap);
+constructor TAnt.Create(APheromoneData: TPheromoneData);
 begin
-  FPheromoneMap := APheromoneMap;
+  FPheromoneData := APheromoneData;
+  FPassedPoints := TBitfield.Create(Graph.Connections.Count);
   FPath := TPath.Create;
-  InfluencedFactor := PheromoneMap.InfluencedFactor;
 end;
 
 destructor TAnt.Destroy;
 begin
   FPath.Free;
+  FPassedPoints.Free;
   inherited;
 end;
 
-function TAnt.ChooseConnection(APoint: TPheromoneMap.TPoint; out AConnection: TPheromoneMap.TConnection): Boolean;
+function TAnt.ChooseConnection(APoint: TGraph.TPoint; out AConnection: TGraph.TConnection): Boolean;
 
   function InfluencePheromones(APheromones: Single): Single;
   begin
@@ -267,20 +192,20 @@ function TAnt.ChooseConnection(APoint: TPheromoneMap.TPoint; out AConnection: TP
   end;
 
 var
-  Connections: TPheromoneMap.TConnections;
-  Connection: TPheromoneMap.TConnection;
+  Connections: TGraph.TConnections;
+  Connection: TGraph.TConnection;
   TotalPheromones: Single;
   ConnectionIndex: Integer;
 begin
   // Create a list of all valid next connections
   TotalPheromones := 0;
-  Connections := TPheromoneMap.TConnections.Create;
+  Connections := TGraph.TConnections.Create;
   for Connection in APoint.Connections do
   begin
     if not PassedPoint(Connection.Other(APoint)) then
     begin
       Connections.Add(Connection);
-      TotalPheromones := TotalPheromones + InfluencePheromones(Connection.Pheromones);
+      TotalPheromones := TotalPheromones + InfluencePheromones(PheromoneData[Connection]);
     end;
   end;
 
@@ -296,9 +221,9 @@ begin
 
       // Sort by best pheromone amount
       Connections.Sort(
-        function(A, B: TPheromoneMap.TConnection): Boolean
+        function(A, B: TGraph.TConnection): Boolean
         begin
-          Result := A.Pheromones > B.Pheromones;
+          Result := PheromoneData[A] > PheromoneData[B];
         end
         );
 
@@ -306,7 +231,7 @@ begin
       TotalPheromones := Random * TotalPheromones;
       while ConnectionIndex < Connections.MaxIndex do
       begin
-        TotalPheromones := TotalPheromones - InfluencePheromones(Connections[ConnectionIndex].Pheromones);
+        TotalPheromones := TotalPheromones - InfluencePheromones(PheromoneData[Connections[ConnectionIndex]]);
         if TotalPheromones <= 0 then
           Break;
         Inc(ConnectionIndex);
@@ -322,17 +247,36 @@ end;
 
 procedure TAnt.FindPath;
 var
-  Current: TPheromoneMap.TPoint;
-  Connection: TPheromoneMap.TConnection;
+  Current: TGraph.TPoint;
+  Connection: TGraph.TConnection;
 begin
-  Current := PheromoneMap.StartPoint;
-  while (Current <> PheromoneMap.FinishPoint) and ChooseConnection(Current, Connection) do
+  Current := Graph.StartPoint;
+  FPassedPoints[Current.Index] := True;
+  while Current <> Graph.FinishPoint do
   begin
-    FPath.Add(Connection);
-    Current := Connection.Other(Current);
-    FPathLength := FPathLength + Connection.Cost;
+    if ChooseConnection(Current, Connection) then
+    begin
+      FPath.Add(Connection);
+      Current := Connection.Other(Current);
+      FPassedPoints[Current.Index] := True;
+    end
+    else
+    begin
+      if Path.Empty then
+        Break;
+      Current := FPath.Last.Other(Current);
+      FPath.RemoveLast;
+    end;
   end;
-  FSuccess := Current = PheromoneMap.FinishPoint;
+  FPathLength := 0;
+  for Connection in Path do
+    FPathLength := FPathLength + Connection.Cost;
+  FSuccess := Current = Graph.FinishPoint;
+end;
+
+function TAnt.GetGraph: TGraph;
+begin
+  Result := PheromoneData.Graph;
 end;
 
 function TAnt.GetPath: TPath.TReader;
@@ -349,227 +293,38 @@ begin
 end;
 
 procedure TAnt.LeaveTrail;
-var
-  Connection: TPheromoneMap.TConnection;
-  P: Single;
 begin
-  P := PheromoneAmount;
-  for Connection in Path do
-    Connection.LeaveTrail(P);
+  PheromoneData.LeaveTrail(FPath, PheromoneAmount);
 end;
 
-function TAnt.PassedPoint(APoint: TPheromoneMap.TPoint): Boolean;
-var
-  Connection: TPheromoneMap.TConnection;
+function TAnt.PassedPoint(APoint: TGraph.TPoint): Boolean;
 begin
-  for Connection in Path do
-    if Connection.EitherIs(APoint) then
-      Exit(True);
-  Result := False;    
-end;
-
-{ TPheromoneMap }
-
-procedure TPheromoneMap.ClearTrails;
-var
-  Connection: TConnection;
-begin
-  for Connection in Connections do
-    Connection.Pheromones := 0;
-end;
-
-constructor TPheromoneMap.Create(AGraph: TGraph);
-var
-  Point: TGraph.TPoint;
-  Connection: TGraph.TConnection;
-  NewConnection: TConnection;
-begin
-  FPoints := TPoints.Create(True);
-  FConnections := TConnections.Create(True);
-
-  for Point in AGraph.Points do
-    FPoints.Add(TPoint.Create(Self, Point.Pos));
-
-  for Connection in AGraph.Connections do
-  begin
-    NewConnection := TConnection.Create(Self, Points[Connection.PointA.Index], Points[Connection.PointB.Index],
-      Connection.CostFactor);
-    FConnections.Add(NewConnection);
-    NewConnection.PointA.FConnections.Add(NewConnection);
-    NewConnection.PointB.FConnections.Add(NewConnection);
-  end;
-  if AGraph.StartPoint <> nil then
-    FStartPoint := Points[AGraph.StartPoint.Index];
-  if AGraph.FinishPoint <> nil then
-    FFinishPoint := Points[AGraph.FinishPoint.Index];
-
-  FPheromoneDissipation := 0.5;
-  FInfluencedFactor := 0.8;
-
-  FValid := (StartPoint <> nil) and (FinishPoint <> nil);
-end;
-
-destructor TPheromoneMap.Destroy;
-begin
-  FPoints.Free;
-  FConnections.Free;
-  inherited;
-end;
-
-procedure TPheromoneMap.DissipatePheromones;
-var
-  Connection: TConnection;
-begin
-  for Connection in Connections do
-    Connection.DissipatePheromones(PheromoneDissipation);
-end;
-
-function TPheromoneMap.GetConnections: TConnections.TReader;
-begin
-  Result := FConnections.Reader;
-end;
-
-function TPheromoneMap.GetPoints: TPoints.TReader;
-begin
-  Result := FPoints.Reader;
-end;
-
-{ TPheromoneMap.TPosition }
-
-function TPheromoneMap.TPosition.GetFinish: TPoint;
-begin
-  if Connection = nil then
-    Exit(nil);
-  Result := Connection.Other(Start);
-end;
-
-function TPheromoneMap.TPosition.GetVisualPos: TVector2;
-begin
-  Result := Start.Pos * (1 - Progress);
-  if Progress <> 0 then
-    Result := Result + Finish.Pos * Progress;
-end;
-
-procedure TPheromoneMap.TPosition.SetProgress(const Value: Single);
-begin
-  if Progress = Value then
-    Exit;
-  FProgress := Value;
-end;
-
-procedure TPheromoneMap.TPosition.SetStart(const Value: TPoint);
-begin
-  FStart := Value;
-  FConnection := nil;
-  FProgress := 0;
-end;
-
-procedure TPheromoneMap.TPosition.StartMovement(AConnection: TConnection);
-begin
-  FConnection := AConnection;
-  FProgress := 0;
-end;
-
-procedure TPheromoneMap.TPosition.StartMovement(AStart: TPoint; AConnection: TConnection);
-begin
-  FStart := AStart;
-  StartMovement(AConnection);
-end;
-
-{ TPheromoneMap.TConnection }
-
-constructor TPheromoneMap.TConnection.Create(APheromoneMap: TPheromoneMap; APointA, APointB: TPoint;
-ACostFactor: Single);
-begin
-  FPheromoneMap := APheromoneMap;
-  FPointA := APointA;
-  FPointB := APointB;
-  FCost := ACostFactor * APointA.Pos.DistanceTo(APointB.Pos);
-end;
-
-procedure TPheromoneMap.TConnection.DissipatePheromones(APercentage: Single);
-begin
-  Pheromones := Pheromones * (1 - APercentage)
-end;
-
-function TPheromoneMap.TConnection.EitherIs(APoint: TPoint): Boolean;
-begin
-  Result := (APoint = PointA) or (APoint = PointB);
-end;
-
-procedure TPheromoneMap.TConnection.LeaveTrail(AAmount: Single);
-begin
-  Pheromones := Pheromones + AAmount;
-end;
-
-function TPheromoneMap.TConnection.Other(APoint: TPoint): TPoint;
-begin
-  if APoint = PointA then
-    Exit(PointB);
-  Result := PointA;
-end;
-
-procedure TPheromoneMap.TConnection.SetPheromones(const Value: Single);
-begin
-  FPheromones := Value;
-end;
-
-{ TPheromoneMap.TPoint }
-
-function TPheromoneMap.TPoint.ConnectionTo(APoint: TPoint): TConnection;
-begin
-  for Result in Connections do
-    if Result.Other(Self) = APoint then
-      Exit;
-  Result := nil;
-end;
-
-constructor TPheromoneMap.TPoint.Create(APheromoneMap: TPheromoneMap; APos: TVector2);
-begin
-  FPheromoneMap := APheromoneMap;
-  FPos := APos;
-  FConnections := TConnections.Create;
-end;
-
-destructor TPheromoneMap.TPoint.Destroy;
-begin
-  FConnections.Free;
-  inherited;
-end;
-
-function TPheromoneMap.TPoint.GetConnections: TConnections.TReader;
-begin
-  Result := FConnections.Reader;
-end;
-
-function TPheromoneMap.TPoint.IsFinish: Boolean;
-begin
-  Result := PheromoneMap.FinishPoint = Self;
-end;
-
-function TPheromoneMap.TPoint.IsStart: Boolean;
-begin
-  Result := PheromoneMap.StartPoint = Self;
+  Result := FPassedPoints[APoint.Index];
 end;
 
 { TSimulation }
 
-constructor TSimulation.Create(APheromoneMap: TPheromoneMap);
+constructor TSimulation.Create(AGraph: TGraph);
 begin
-  FPheromoneMap := APheromoneMap;
+  FGraph := AGraph.Copy;
+  FInitialPheromoneData := TPheromoneData.Create(Graph);
   FBatches := TBatches.Create;
   FBatchSize := 20;
+  FInfluencedFactor := 0.9;
+  FPheromoneDissipation := 0.5;
 end;
 
 destructor TSimulation.Destroy;
 begin
+  FGraph.Free;
+  FInitialPheromoneData.Free;
   FBatches.Free;
   inherited;
 end;
 
 function TSimulation.GenerateBatch: TBatch;
 begin
-  Result := TBatch.Create(PheromoneMap, BatchSize);
+  Result := TBatch.Create(Self, BatchSize);
   FBatches.Add(Result);
 end;
 
@@ -578,37 +333,58 @@ begin
   Result := FBatches.Reader;
 end;
 
+function TSimulation.GetGraph: TGraph;
+begin
+  Result := FInitialPheromoneData.Graph;
+end;
+
+function TSimulation.GetPheromoneData: TPheromoneData;
+begin
+  if Batches.Empty then
+    Exit(FInitialPheromoneData);
+  Result := Batches.Last.PheromoneData;
+end;
+
 procedure TSimulation.Clear;
 begin
-  PheromoneMap.ClearTrails;
+  FInitialPheromoneData.Clear;
   FBatches.Clear;
 end;
 
 { TSimulation.TBatch }
 
-constructor TSimulation.TBatch.Create(APheromoneMap: TPheromoneMap; ACount: Integer);
+constructor TSimulation.TBatch.Create(ASimulation: TSimulation; ACount: Integer);
 var
   I: Integer;
   Ant: TAnt;
 begin
-  FPheromoneMap := APheromoneMap;
+  FSimulation := ASimulation;
+  FPheromoneData := Simulation.PheromoneData.Copy;
+  PheromoneData.Dissipate(Simulation.PheromoneDissipation);
+
   FAnts := TAnts.Create;
-
-  PheromoneMap.DissipatePheromones;
-
   for I := 0 to ACount - 1 do
   begin
-    Ant := TAnt.Create(PheromoneMap);
+    Ant := TAnt.Create(PheromoneData);
+    Ant.InfluencedFactor := Simulation.InfluencedFactor;
     FAnts.Add(Ant);
     Ant.FindPath;
   end;
 
   for Ant in Ants do
     Ant.LeaveTrail;
+
+  FAnts.Sort(
+    function(A, B: TAnt): Boolean
+    begin
+      Result := A.PathLength < B.PathLength;
+    end
+  );
 end;
 
 destructor TSimulation.TBatch.Destroy;
 begin
+  FPheromoneData.Free;
   FAnts.Free;
   inherited;
 end;
@@ -616,6 +392,77 @@ end;
 function TSimulation.TBatch.GetAnts: TAnts.TReader;
 begin
   Result := FAnts.Reader;
+end;
+
+function TSimulation.TBatch.GetPathLengthStatistic: TStatistic;
+var
+  Ant: TAnt;
+begin
+  if Ants.Empty then
+    raise Exception.Create('Data required to generate statistic.');
+
+  Result[stBest] := Ants.First.PathLength;
+  Result[stWorst] := Ants.Last.PathLength;
+  Result[stAverage] := 0;
+  for Ant in Ants do
+    Result[stAverage] := Result[stAverage] + Ant.PathLength;
+  Result[stAverage] := Result[stAverage] / Ants.Count;
+
+  Result[stMedian] := Ants[Ants.MaxIndex div 2].PathLength;
+  if not Odd(FAnts.Count) then
+    Result[stMedian] := (Result[stMedian] + Ants[Ants.MaxIndex div 2 + 1].PathLength) / 2;
+end;
+
+{ TPheromoneData }
+
+procedure TPheromoneData.Assign(AFrom: TPheromoneData);
+begin
+  FGraph := AFrom.Graph;
+  SetLength(FPheromones, AFrom.Graph.Connections.Count);
+  Move(AFrom.FPheromones[0], FPheromones[0], Length(FPheromones) * SizeOf(FPheromones[0]));
+end;
+
+procedure TPheromoneData.Clear;
+begin
+  FillChar(FPheromones[0], Length(FPheromones) * SizeOf(FPheromones[0]), 0);
+end;
+
+function TPheromoneData.Copy: TPheromoneData;
+begin
+  Result := TPheromoneData.Create(Graph);
+  Result.Assign(Self);
+end;
+
+constructor TPheromoneData.Create(AGraph: TGraph);
+begin
+  FGraph := AGraph;
+  SetLength(FPheromones, Graph.Connections.Count);
+end;
+
+procedure TPheromoneData.Dissipate(APercentage: Single);
+var
+  I: Integer;
+begin
+  for I := 0 to Length(FPheromones) - 1 do
+    FPheromones[I] := FPheromones[I] * (1 - APercentage);
+end;
+
+function TPheromoneData.GetPheromones(AConnection: TGraph.TConnection): Single;
+begin
+  Result := FPheromones[AConnection.Index];
+end;
+
+procedure TPheromoneData.LeaveTrail(APath: IIterable<TGraph.TConnection>; AAmount: Single);
+var
+  Connection: TGraph.TConnection;
+begin
+  for Connection in APath do
+    Pheromones[Connection] := Pheromones[Connection] + AAmount;
+end;
+
+procedure TPheromoneData.SetPheromones(AConnection: TGraph.TConnection; const Value: Single);
+begin
+  FPheromones[AConnection.Index] := Value;
 end;
 
 end.

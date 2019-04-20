@@ -72,7 +72,7 @@ type
 
   end;
 
-  TDisplay = class
+  TDisplay = class abstract
   private
     FPaintBox: TPaintBox;
     FCamera: TCamera;
@@ -101,6 +101,8 @@ type
     procedure SetCamera(const Value: TCamera);
 
   protected
+    function GetGraph: TGraph; virtual; abstract;
+
     procedure Paint(G: IGPGraphics); virtual;
     procedure Drag(AAmount: TVector2); virtual;
     procedure Hover(APos: TVector2); virtual;
@@ -116,6 +118,8 @@ type
 
     property PaintBox: TPaintBox read FPaintBox;
     property PaintBoxSize: TIntVector2 read GetPaintBoxSize;
+
+    property Graph: TGraph read GetGraph;
 
     property Camera: TCamera read FCamera write SetCamera;
     property CameraMatrix: IGPMatrix read GetCameraMatrix;
@@ -133,20 +137,23 @@ type
     TEvent = TEvent<TEventInfo>;
 
   private
-    FGraph: TGraph;
+    FGraph: TGraphEditable;
     FTool: TEditorTool;
-    FPointAtCursor: TGraph.TPoint;
-    FConnectionAtCursor: TGraph.TConnection;
-    FConnectionStart: TGraph.TPoint;
+    FPointAtCursor: TGraphEditable.TPoint;
+    FConnectionAtCursor: TGraphEditable.TConnection;
+    FConnectionStart: TGraphEditable.TPoint;
     FConnectionDrag: TVector2;
     FOnToolChange: TEvent;
 
     procedure SetTool(const Value: TEditorTool);
 
     function GetOnToolChange: TEvent.TAccess;
-    procedure SetGraph(const Value: TGraph);
+
+    procedure SetGraph(const Value: TGraphEditable);
 
   protected
+    function GetGraph: TGraph; override;
+
     procedure Paint(G: IGPGraphics); override;
     procedure Drag(AAmount: TVector2); override;
     procedure Hover(APos: TVector2); override;
@@ -158,7 +165,7 @@ type
     constructor Create(APaintBox: TPaintBox);
     destructor Destroy; override;
 
-    property Graph: TGraph read FGraph write SetGraph;
+    property Graph: TGraphEditable read FGraph write SetGraph;
 
     property Tool: TEditorTool read FTool write SetTool;
 
@@ -168,20 +175,23 @@ type
 
   TSimulationDisplay = class(TDisplay)
   private
-    FPheromoneMap: TPheromoneMap;
-    FAnt: TAnt;
+    FPheromoneData: TPheromoneData;
+    FVisibleAnt: TAnt;
+
+    procedure SetPheromoneData(const Value: TPheromoneData);
+    procedure HideAntPath;
+    procedure SetVisibleAnt(const Value: TAnt);
+    procedure ShowAntPath(AAnt: TAnt);
 
   protected
+    function GetGraph: TGraph; override;
+
     procedure Paint(G: IGPGraphics); override;
 
   public
-    constructor Create(APaintBox: TPaintBox; AGraph: TGraph);
-    destructor Destroy; override;
+    property PheromoneData: TPheromoneData read FPheromoneData write SetPheromoneData;
 
-    property PheromoneMap: TPheromoneMap read FPheromoneMap;
-
-    procedure ShowAntPath(AAnt: TAnt);
-    procedure HideAntPath;
+    property VisibleAnt: TAnt read FVisibleAnt write SetVisibleAnt;
 
   end;
 
@@ -322,7 +332,7 @@ end;
 constructor TEditorDisplay.Create(APaintBox: TPaintBox);
 begin
   inherited;
-  FGraph := TGraph.Create;
+  FGraph := TGraphEditable.Create;
   FGraph.OnChange.Add(PaintBox.Invalidate);
 end;
 
@@ -342,6 +352,11 @@ begin
     inherited;
 end;
 
+function TEditorDisplay.GetGraph: TGraph;
+begin
+  Result := Graph;
+end;
+
 function TEditorDisplay.GetOnToolChange: TEvent.TAccess;
 begin
   Result := FOnToolChange.Access;
@@ -351,7 +366,7 @@ procedure TEditorDisplay.Hover(APos: TVector2);
 var
   OldPointAtCursor: TOpt<TGraph.TPoint>;
   OldConnectionAtCursor: TOpt<TGraph.TConnection>;
-  Point: TGraph.TPoint;
+  Point: TGraphEditable.TPoint;
   NewDistance, ClosestDistance: Single;
 begin
   // First find hovered point
@@ -441,8 +456,8 @@ end;
 
 procedure TEditorDisplay.Paint(G: IGPGraphics);
 var
-  Connection: TGraph.TConnection;
-  Point: TGraph.TPoint;
+  Connection: TGraphEditable.TConnection;
+  Point: TGraphEditable.TPoint;
   Brush: IGPSolidBrush;
   R: TGPRectF;
   Pen: IGPPen;
@@ -568,7 +583,7 @@ begin
   Paint(G);
 end;
 
-procedure TEditorDisplay.SetGraph(const Value: TGraph);
+procedure TEditorDisplay.SetGraph(const Value: TGraphEditable);
 begin
   Graph.Assign(Value);
 end;
@@ -652,47 +667,42 @@ end;
 
 { TSimulationDisplay }
 
-constructor TSimulationDisplay.Create(APaintBox: TPaintBox; AGraph: TGraph);
+function TSimulationDisplay.GetGraph: TGraph;
 begin
-  inherited Create(APaintBox);
-  FPheromoneMap := TPheromoneMap.Create(AGraph);
-end;
-
-destructor TSimulationDisplay.Destroy;
-begin
-  FPheromoneMap.Free;
-  inherited;
+  if FPheromoneData = nil then
+    Exit(nil);
+  Result := PheromoneData.Graph;
 end;
 
 procedure TSimulationDisplay.HideAntPath;
 begin
-  FAnt := nil;
+  FVisibleAnt := nil;
   PaintBox.Invalidate;
 end;
 
 procedure TSimulationDisplay.Paint(G: IGPGraphics);
 var
-  Connection: TPheromoneMap.TConnection;
-  Point: TPheromoneMap.TPoint;
-  ColorRGB: TColorRGBA;
-  Color: TGPColor;
-  Brush, StartFinishBrush: IGPBrush;
-  Rect: TGPRectF;
-  MaxPheromones: Single;
   Pen: IGPPen;
+  Connection: TGraph.TConnection;
+  MaxPheromones: Single;
+  ColorRGB: TColorRGB;
+  Color: TGPColor;
+  Brush: IGPSolidBrush;
+  StartFinishBrush: IGPSolidBrush;
+  Rect: TGPRectF;
+  Point: TGraph.TPoint;
 begin
   MaxPheromones := 0;
-  for Connection in PheromoneMap.Connections do
-    MaxPheromones := Max(MaxPheromones, Connection.Pheromones);
+  for Connection in PheromoneData.Graph.Connections do
+    MaxPheromones := Max(MaxPheromones, PheromoneData[Connection]);
 
   // Prevent division by zero
   if MaxPheromones = 0 then
     MaxPheromones := 1;
 
-  for Connection in PheromoneMap.Connections do
+  for Connection in PheromoneData.Graph.Connections do
   begin
-
-    ColorRGB := TColorRGB.HSV(2 - Connection.Pheromones / MaxPheromones * 3, 1.0, 0.8);
+    ColorRGB := TColorRGB.HSV(2 - PheromoneData[Connection] / MaxPheromones * 3, 1.0, 0.8);
     Color.InitializeFromColorRef(ColorRGB.ToWinColor);
 
     with Connection do
@@ -703,7 +713,7 @@ begin
   Color.InitializeFromColorRef(ColorRGB.ToWinColor);
   Brush := TGPSolidBrush.Create(Color);
   StartFinishBrush := TGPSolidBrush.Create(TGPColor.Brown);
-  for Point in PheromoneMap.Points do
+  for Point in PheromoneData.Graph.Points do
   begin
     with Point do
     begin
@@ -716,28 +726,49 @@ begin
     end;
   end;
 
-  if FAnt <> nil then
+  if FVisibleAnt <> nil then
   begin
-    for Connection in FAnt.Path do
+    if FVisibleAnt.Success then
+      Pen := TGPPen.Create(TGPColor.Blue, LineWidth * 1.5)
+    else
+      Pen := TGPPen.Create(TGPColor.Red, LineWidth * 1.5);
+    for Connection in FVisibleAnt.Path do
       with Connection do
-        G.DrawLine(TGPPen.Create(TGPColor.Blue, LineWidth * 1.5), PointA.Pos.X, PointA.Pos.Y, PointB.Pos.X,
+        G.DrawLine(Pen, PointA.Pos.X, PointA.Pos.Y, PointB.Pos.X,
           PointB.Pos.Y);
   end;
 
   {
-    Brush := TGPSolidBrush.Create(TGPColor.Create(128, 0, 0, 0));
-    for Ant in PheromoneMap.ActiveAnts do
-    begin
-    Rect.Initialize(Ant.Position.VisualPos.X, Ant.Position.VisualPos.Y, 0, 0);
-    Rect.Inflate(LineWidth);
-    G.FillEllipse(Brush, Rect);
-    end;
-  }
+  if (FAnt <> nil) and not FAnt.Path.Empty then
+  begin
+    SetLength(AntPath, FAnt.Path.Count + 1);
+    for I := 0 to FAnt.Path.MaxIndex do
+      AntPath[I] := TGPPointF(FAnt.Path[I].PointA.Pos);
+    AntPath[FAnt.Path.MaxIndex + 1] := TGPPointF(FAnt.Path.Last.PointB.Pos);
+
+    Pen := TGPPen.Create(TGPColor.Blue, LineWidth * 1.5);
+    G.DrawCurve(Pen, AntPath, 0.9);
+  end;
+   }
+end;
+
+procedure TSimulationDisplay.SetPheromoneData(const Value: TPheromoneData);
+begin
+  if PheromoneData = Value then
+    Exit;
+  FPheromoneData := Value;
+  PaintBox.Invalidate;
+end;
+
+procedure TSimulationDisplay.SetVisibleAnt(const Value: TAnt);
+begin
+  FVisibleAnt := Value;
+  PaintBox.Invalidate;
 end;
 
 procedure TSimulationDisplay.ShowAntPath(AAnt: TAnt);
 begin
-  FAnt := AAnt;
+  FVisibleAnt := AAnt;
   PaintBox.Invalidate;
 end;
 

@@ -36,13 +36,13 @@ type
     procedure FormDeactivate(Sender: TObject);
     procedure FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
   private
-    FGraph: TGraph;
+    FGraph: TGraphEditable;
 
   protected
     procedure UpdateActions; override;
 
   public
-    procedure Execute(AGraph: TGraph);
+    procedure Execute(AGraph: TGraphEditable);
 
   end;
 
@@ -63,7 +63,7 @@ begin
   Close;
 end;
 
-procedure TmdlgGenerateGrid.Execute(AGraph: TGraph);
+procedure TmdlgGenerateGrid.Execute(AGraph: TGraphEditable);
 begin
   FGraph := AGraph;
   ModalResult := mrCancel;
@@ -75,7 +75,7 @@ procedure TmdlgGenerateGrid.FormClose(Sender: TObject; var Action: TCloseAction)
 begin
   if ModalResult = mrOk then
   begin
-    with TGraph.TGridGenerator.Create(FGraph) do
+    with TGraphEditable.TGridGenerator.Create(FGraph) do
     begin
       try
         Size := IVec2(seWidth.Value, seHeight.Value);

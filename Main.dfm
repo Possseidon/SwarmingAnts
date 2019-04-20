@@ -248,13 +248,6 @@ object frmMain: TfrmMain
         Height = 13
         Caption = 'Batch:'
       end
-      object lbTodoBatchStatistics: TLabel
-        Left = 56
-        Top = 64
-        Width = 109
-        Height = 13
-        Caption = 'TODO: Batch Statistics'
-      end
       object seBatch: TSpinEdit
         Left = 112
         Top = 24
@@ -266,20 +259,21 @@ object frmMain: TfrmMain
         TabOrder = 0
         Value = 1
         OnChange = seBatchChange
+        OnExit = seBatchExit
       end
       object lvAnts: TListView
         Left = 12
-        Top = 96
+        Top = 103
         Width = 203
-        Height = 209
+        Height = 179
         Columns = <
           item
-            Caption = 'ID'
-            Width = 30
+            Caption = 'Rang'
+            Width = 40
           end
           item
             Caption = 'Pfadl'#228'nge'
-            Width = 80
+            Width = 100
           end>
         ReadOnly = True
         RowSelect = True
@@ -288,6 +282,28 @@ object frmMain: TfrmMain
         OnColumnClick = lvAntsColumnClick
         OnCompare = lvAntsCompare
         OnSelectItem = lvAntsSelectItem
+      end
+      object btnHidePath: TButton
+        Left = 12
+        Top = 288
+        Width = 203
+        Height = 25
+        Action = actHidePath
+        TabOrder = 2
+      end
+      object sgStatistics: TStringGrid
+        Left = 12
+        Top = 52
+        Width = 203
+        Height = 45
+        Color = clBtnFace
+        ColCount = 4
+        DefaultColWidth = 49
+        DefaultRowHeight = 20
+        FixedCols = 0
+        RowCount = 2
+        ScrollBars = ssNone
+        TabOrder = 3
       end
     end
     object gbControl: TGroupBox
@@ -321,9 +337,9 @@ object frmMain: TfrmMain
         TabOrder = 1
       end
       object btnGenerate: TButton
-        Left = 16
+        Left = 12
         Top = 54
-        Width = 199
+        Width = 184
         Height = 25
         Action = actGenerate
         Anchors = [akLeft, akBottom]
@@ -521,6 +537,12 @@ object frmMain: TfrmMain
       Category = 'Simulation'
       Caption = 'Zur'#252'cksetzen'
       OnExecute = actResetExecute
+    end
+    object actHidePath: TAction
+      Category = 'Simulation'
+      Caption = 'Pfad ausblenden'
+      OnExecute = actHidePathExecute
+      OnUpdate = actHidePathUpdate
     end
   end
   object ilIcons: TImageList

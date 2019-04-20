@@ -10,9 +10,12 @@ uses
   Pengine.Collections,
   Pengine.IntMaths,
   Pengine.Interfaces,
-  Pengine.JSON;
+  Pengine.JSON,
+  Pengine.Utility;
 
 type
+
+  TGraphEditable = class;
 
   TGraph = class(TInterfaceBase, IJSerializable)
   public type
@@ -26,30 +29,150 @@ type
       FGraph: TGraph;
       FPos: TVector2;
       FConnections: TConnections;
+      FIndex: Integer;
 
+    protected
+      function GetPos: TVector2;
       procedure SetPos(const Value: TVector2);
-      function GetConnections: TConnections.TReader;
 
-      function GetIsFinish: Boolean;
       function GetIsStart: Boolean;
-      procedure SetIsFinish(const Value: Boolean);
       procedure SetIsStart(const Value: Boolean);
-      function GetIndex: Integer;
+      function GetIsFinish: Boolean;
+      procedure SetIsFinish(const Value: Boolean);
+
+      function GetConnections: TConnections.TReader;
 
     public
       constructor Create(AGraph: TGraph; APos: TVector2);
       destructor Destroy; override;
 
-      property Index: Integer read GetIndex;
+      procedure Remove;
+
+      property Index: Integer read FIndex;
 
       property Graph: TGraph read FGraph;
 
-      property Pos: TVector2 read FPos write SetPos;
+      property Pos: TVector2 read FPos;
 
       property Connections: TConnections.TReader read GetConnections;
 
       function IsConnected(AOther: TPoint): Boolean;
       function FindConnection(AOther: TPoint): TConnection;
+
+      property IsStart: Boolean read GetIsStart;
+      property IsFinish: Boolean read GetIsFinish;
+
+    end;
+
+    TConnection = class
+    private
+      FGraph: TGraph;
+      FPointA: TPoint;
+      FPointB: TPoint;
+      FCostFactor: Single;
+      FIndex: Integer;
+
+      function GetCost: Single;
+
+    protected
+      function GetCostFactor: Single;
+      procedure SetCostFactor(const Value: Single);
+
+    public
+      constructor Create(AGraph: TGraph; APointA, APointB: TPoint);
+      destructor Destroy; override;
+
+      procedure Remove;
+
+      property Graph: TGraph read FGraph;
+      property Index: Integer read FIndex;
+
+      function AnyIs(APoint: TPoint): Boolean;
+      function Other(APoint: TPoint): TPoint;
+
+      property PointA: TPoint read FPointA;
+      property PointB: TPoint read FPointB;
+      property CostFactor: Single read GetCostFactor;
+      property Cost: Single read GetCost;
+
+    end;
+
+    TPoints = TRefArray<TPoint>;
+
+  private
+    FPoints: TPoints;
+    FConnections: TConnections;
+    FStartPoint: TPoint;
+    FFinishPoint: TPoint;
+
+    function GetConnections: TConnections.TReader;
+    function GetPoints: TPoints.TReader;
+
+  protected
+    procedure DoDefineJStorage(ASerializer: TJSerializer);
+
+    procedure Assign(AFrom: TGraph);
+
+    function AddPointX(APos: TVector2): TPoint; virtual;
+    function ConnectX(A, B: TPoint): TConnection; virtual;
+
+    procedure Remove(APoint: TPoint); overload;
+    procedure Remove(AConnection: TConnection); overload;
+
+    procedure Clear;
+
+    procedure SetFinishPoint(const Value: TPoint);
+    procedure SetStartPoint(const Value: TPoint);
+
+    procedure Changed; virtual;
+
+  public
+    constructor Create;
+    destructor Destroy; override;
+
+    /// <returns>An exact copy of the whole graph.</returns>
+    function Copy: TGraphEditable;
+    function CopyReadonly: TGraph;
+
+    /// <summary>A readonly list of all points.</summary>
+    property Points: TPoints.TReader read GetPoints;
+    /// <summary>A readonly list of all connections between points.</summary>
+    property Connections: TConnections.TReader read GetConnections;
+
+    /// <summary>A single start point for this graph.</summary>
+    property StartPoint: TPoint read FStartPoint;
+    /// <summary>A single finish point for this graph.</summary>
+    property FinishPoint: TPoint read FFinishPoint;
+
+    function HasStart: Boolean;
+    function HasFinish: Boolean;
+    function Valid: Boolean;
+
+    // IJSerializable
+    function GetJVersion: Integer;
+    procedure DefineJStorage(ASerializer: TJSerializer); virtual;
+
+  end;
+
+  TGraphEditable = class(TGraph)
+  public type
+
+    TEventInfo = TSenderEventInfo<TGraphEditable>;
+
+    TEvent = TEvent<TEventInfo>;
+
+    TConnection = class;
+
+    TPoint = class(TGraph.TPoint)
+    private
+      function GetGraph: TGraphEditable;
+
+    public
+      constructor Create(AGraph: TGraphEditable; APos: TVector2);
+
+      property Graph: TGraphEditable read GetGraph;
+
+      property Pos: TVector2 read GetPos write SetPos;
 
       function Connect(AOther: TPoint): TConnection;
 
@@ -58,54 +181,31 @@ type
 
     end;
 
-    TConnection = class
-    public type
+    TPoints = TRefArray<TPoint>;
 
-      TEventInfo = TSenderEventInfo<TConnection>;
-
-      TEvent = TEvent<TEventInfo>;
-
+    TConnection = class(TGraph.TConnection)
     private
-      FGraph: TGraph;
-      FPointA: TPoint;
-      FPointB: TPoint;
-      FCostFactor: Single;
-      FOnChange: TEvent;
-
-      function GetCost: Single;
-      procedure SetCostFactor(const Value: Single);
-      function GetIndex: Integer;
-      function GetOnChange: TEvent.TAccess;
+      function GetGraph: TGraphEditable;
 
     public
-      constructor Create(AGraph: TGraph; APointA, APointB: TPoint);
-      destructor Destroy; override;
+      constructor Create(AGraph: TGraphEditable; APointA, APointB: TPoint);
 
-      property Graph: TGraph read FGraph;
-      property Index: Integer read GetIndex;
+      property Graph: TGraphEditable read GetGraph;
 
-      function AnyIs(APoint: TPoint): Boolean;
-      function Other(APoint: TPoint): TPoint;
-
-      property PointA: TPoint read FPointA;
-      property PointB: TPoint read FPointB;
-      property CostFactor: Single read FCostFactor write SetCostFactor;
-      property Cost: Single read GetCost;
-
-      property OnChange: TEvent.TAccess read GetOnChange;
+      property CostFactor: Single read GetCostFactor write SetCostFactor;
 
     end;
 
-    TPoints = TRefArray<TPoint>;
+    TConnections = TRefArray<TConnection>;
 
     TGenerator = class abstract
     private
-      FGraph: TGraph;
+      FGraph: TGraphEditable;
 
     public
-      constructor Create(AGraph: TGraph);
+      constructor Create(AGraph: TGraphEditable);
 
-      property Graph: TGraph read FGraph;
+      property Graph: TGraphEditable read FGraph;
 
       procedure Generate; virtual; abstract;
 
@@ -142,33 +242,26 @@ type
 
     end;
 
-    TEventInfo = TSenderEventInfo<TGraph>;
-
-    TEvent = TEvent<TEventInfo>;
-
   private
-    FPoints: TPoints;
-    FConnections: TConnections;
-    FStartPoint: TPoint;
-    FFinishPoint: TPoint;
-    FOnChange: TEvent;
+    FOnChange: TGraphEditable.TEvent;
 
-    procedure Changed;
-
-    function GetConnections: TConnections.TReader;
-    function GetPoints: TPoints.TReader;
-    procedure SetFinishPoint(const Value: TPoint);
+    function GetStartPoint: TPoint;
     procedure SetStartPoint(const Value: TPoint);
+    function GetFinishPoint: TPoint;
+    procedure SetFinishPoint(const Value: TPoint);
+
+    function GetPoints: TPoints.TReader;
+    function GetConnections: TConnections.TReader;
+
+  protected
+    procedure Changed; override;
+
+    function AddPointX(APos: TVector2): TGraph.TPoint; override;
+    function ConnectX(A, B: TGraph.TPoint): TGraph.TConnection; override;
 
   public
-    constructor Create;
-    destructor Destroy; override;
-
+    /// <summary>Copies everything from the given graph to this graph.</summary>
     procedure Assign(AFrom: TGraph);
-
-    /// <returns>An exact copy of the whole graph.</returns>
-    /// <remarks>Runtime of O(n^2), as this uses the <c>Index</c> property which uses linear lookup.</remarks>
-    function Copy: TGraph;
 
     /// <summary>A readonly list of all points.</summary>
     property Points: TPoints.TReader read GetPoints;
@@ -176,24 +269,23 @@ type
     property Connections: TConnections.TReader read GetConnections;
 
     /// <summary>A single start point for this graph.</summary>
-    property StartPoint: TPoint read FStartPoint write SetStartPoint;
+    property StartPoint: TPoint read GetStartPoint write SetStartPoint;
     /// <summary>A single finish point for this graph.</summary>
-    property FinishPoint: TPoint read FFinishPoint write SetFinishPoint;
+    property FinishPoint: TPoint read GetFinishPoint write SetFinishPoint;
 
     /// <summary>Adds a point at the specified position and returns said point.</summary>
     function AddPoint(APos: TVector2): TPoint;
     /// <summary>Creates a connection between two given points and returns said connection.</summary>
     function Connect(A, B: TPoint): TConnection;
 
+    /// <summary>Called whenever the graph changes in any way.</summary>
+    function OnChange: TGraphEditable.TEvent.TAccess;
+
     /// <summary>Removes all points and connections from the graph.</summary>
     procedure Clear;
 
-    /// <summary>Called whenever the graph changes in any way.</summary>
-    function OnChange: TEvent.TAccess;
-
     // IJSerializable
-    function GetJVersion: Integer;
-    procedure DefineJStorage(ASerializer: TJSerializer);
+    procedure DefineJStorage(ASerializer: TJSerializer); override;
 
   end;
 
@@ -201,32 +293,74 @@ implementation
 
 { TGraph.TPoint }
 
-function TGraph.TPoint.Connect(AOther: TPoint): TConnection;
+procedure TGraph.TPoint.SetPos(const Value: TVector2);
 begin
-  Result := TConnection.Create(Graph, Self, AOther);
+  if Pos = Value then
+    Exit;
+  FPos := Value;
+  Graph.Changed;
+end;
+
+function TGraph.TPoint.GetIsStart: Boolean;
+begin
+  Result := Self = Graph.StartPoint;
+end;
+
+function TGraph.TPoint.GetPos: TVector2;
+begin
+  Result := FPos;
+end;
+
+procedure TGraph.TPoint.SetIsStart(const Value: Boolean);
+begin
+  if Value then
+    Graph.SetStartPoint(Self)
+  else if Graph.StartPoint = Self then
+    Graph.SetStartPoint(nil);
+end;
+
+function TGraph.TPoint.GetIsFinish: Boolean;
+begin
+  Result := Self = Graph.FinishPoint;
+end;
+
+procedure TGraph.TPoint.SetIsFinish(const Value: Boolean);
+begin
+  if Value then
+    Graph.SetFinishPoint(Self)
+  else if Graph.FinishPoint = Self then
+    Graph.SetFinishPoint(nil);
+end;
+
+function TGraph.TPoint.GetConnections: TConnections.TReader;
+begin
+  Result := FConnections.Reader;
 end;
 
 constructor TGraph.TPoint.Create(AGraph: TGraph; APos: TVector2);
 begin
   FGraph := AGraph;
+  FIndex := FGraph.Points.Count;
   FPos := APos;
   FConnections := TConnections.Create;
-  Graph.FPoints.Add(Self);
 end;
 
 destructor TGraph.TPoint.Destroy;
 begin
-  if Graph <> nil then
-  begin
-    IsStart := False;
-    IsFinish := False;
-    while not FConnections.Empty do
-      FConnections.Last.Free;
-    Graph.FPoints.Remove(Self);
-    Graph.Changed;
-  end;
+  while not Connections.Empty do
+    Connections.Last.Remove;
   FConnections.Free;
   inherited;
+end;
+
+function TGraph.TPoint.IsConnected(AOther: TPoint): Boolean;
+begin
+  Result := FindConnection(AOther) <> nil;
+end;
+
+procedure TGraph.TPoint.Remove;
+begin
+  Graph.Remove(Self);
 end;
 
 function TGraph.TPoint.FindConnection(AOther: TPoint): TConnection;
@@ -237,60 +371,93 @@ begin
   Result := nil;
 end;
 
-function TGraph.TPoint.GetConnections: TConnections.TReader;
+{ TGraphEditable.TPoint }
+
+function TGraphEditable.TPoint.GetGraph: TGraphEditable;
 begin
-  Result := FConnections.Reader;
+  Result := TGraphEditable(FGraph);
 end;
 
-function TGraph.TPoint.GetIndex: Integer;
+constructor TGraphEditable.TPoint.Create(AGraph: TGraphEditable; APos: TVector2);
 begin
-  Result := Graph.Points.Find(Self);
+  inherited Create(AGraph, APos);
 end;
 
-function TGraph.TPoint.GetIsFinish: Boolean;
+function TGraphEditable.TPoint.Connect(AOther: TPoint): TConnection;
 begin
-  Result := Self = Graph.FinishPoint;
+  Result := Graph.Connect(Self, AOther);
 end;
 
-function TGraph.TPoint.GetIsStart: Boolean;
+{ TGraph.TConnection }
+
+function TGraph.TConnection.GetCost: Single;
 begin
-  Result := Self = Graph.StartPoint;
+  Result := PointA.Pos.DistanceTo(PointB.Pos) * CostFactor;
 end;
 
-function TGraph.TPoint.IsConnected(AOther: TPoint): Boolean;
+function TGraph.TConnection.GetCostFactor: Single;
 begin
-  Result := FindConnection(AOther) <> nil;
+  Result := FCostFactor;
 end;
 
-procedure TGraph.TPoint.SetIsFinish(const Value: Boolean);
+procedure TGraph.TConnection.SetCostFactor(const Value: Single);
 begin
-  if Value then
-    Graph.FinishPoint := Self
-  else
-    Graph.FinishPoint := nil;
+  FCostFactor := Value;
 end;
 
-procedure TGraph.TPoint.SetIsStart(const Value: Boolean);
+constructor TGraph.TConnection.Create(AGraph: TGraph; APointA, APointB: TPoint);
 begin
-  if Value then
-    Graph.StartPoint := Self
-  else
-    Graph.StartPoint := nil;
+  FGraph := AGraph;
+  FIndex := Graph.Connections.Count;
+  FPointA := APointA;
+  FPointB := APointB;
+  FCostFactor := 1;
+  PointA.FConnections.Add(Self);
+  PointB.FConnections.Add(Self);
 end;
 
-procedure TGraph.TPoint.SetPos(const Value: TVector2);
+destructor TGraph.TConnection.Destroy;
 begin
-  if Pos = Value then
-    Exit;
-  FPos := Value;
-  Graph.Changed;
+  PointA.FConnections.Remove(Self);
+  PointB.FConnections.Remove(Self);
+  inherited;
+end;
+
+function TGraph.TConnection.AnyIs(APoint: TPoint): Boolean;
+begin
+  Result := (APoint = PointA) or (APoint = PointB);
+end;
+
+function TGraph.TConnection.Other(APoint: TPoint): TPoint;
+begin
+  if APoint = PointA then
+    Exit(PointB);
+  Result := PointA;
+end;
+
+procedure TGraph.TConnection.Remove;
+begin
+  Graph.Remove(Self);
+end;
+
+{ TGraphEditable.TConnection }
+
+function TGraphEditable.TConnection.GetGraph: TGraphEditable;
+begin
+  Result := TGraphEditable(FGraph);
+end;
+
+constructor TGraphEditable.TConnection.Create(AGraph: TGraphEditable; APointA, APointB: TPoint);
+begin
+  inherited Create(AGraph, APointA, APointB);
 end;
 
 { TGraph }
 
-function TGraph.AddPoint(APos: TVector2): TPoint;
+function TGraph.AddPointX(APos: TVector2): TPoint;
 begin
   Result := TPoint.Create(Self, APos);
+  FPoints.Add(Result);
 end;
 
 procedure TGraph.Assign(AFrom: TGraph);
@@ -302,41 +469,49 @@ begin
 
   for Point in AFrom.Points do
   begin
-    NewPoint := AddPoint(Point.Pos);
-    NewPoint.IsStart := Point.IsStart;
-    NewPoint.IsFinish := Point.IsFinish;
+    NewPoint := AddPointX(Point.Pos);
+    NewPoint.SetIsStart(Point.IsStart);
+    NewPoint.SetIsFinish(Point.IsFinish);
   end;
 
   for Connection in AFrom.Connections do
   begin
-    NewConnection := Points[Connection.PointA.Index].Connect(Points[Connection.PointB.Index]);
-    NewConnection.CostFactor := Connection.CostFactor;
+    NewConnection := ConnectX(Points[Connection.PointA.Index], Points[Connection.PointB.Index]);
+    NewConnection.SetCostFactor(Connection.CostFactor);
   end;
-
-  if AFrom.StartPoint <> nil then
-    FStartPoint := Points[AFrom.StartPoint.Index];
-  if AFrom.FinishPoint <> nil then
-    FFinishPoint := Points[AFrom.FinishPoint.Index];
 end;
 
-procedure TGraph.Changed;
+{ TGraphEditable }
+
+function TGraphEditable.AddPoint(APos: TVector2): TPoint;
+begin
+  Result := TPoint(AddPointX(APos));
+end;
+
+function TGraphEditable.AddPointX(APos: TVector2): TGraph.TPoint;
+begin
+  Result := TPoint.Create(Self, APos);
+  FPoints.Add(Result);
+end;
+
+procedure TGraphEditable.Assign(AFrom: TGraph);
+begin
+  inherited;
+end;
+
+procedure TGraphEditable.Changed;
 begin
   FOnChange.Execute(TEventInfo.Create(Self));
 end;
 
-procedure TGraph.Clear;
-var
-  Connection: TConnection;
-  Point: TPoint;
+procedure TGraph.Changed;
 begin
-  for Connection in Connections do
-    Connection.FGraph := nil;
-  FConnections.OwnsObjects := True;
-  FConnections.Clear;
+  // nothing by default
+end;
 
-  for Point in Points do
-    Point.FGraph := nil;
-  FPoints.OwnsObjects := True;
+procedure TGraph.Clear;
+begin
+  FConnections.Clear;
   FPoints.Clear;
 
   FStartPoint := nil;
@@ -345,12 +520,65 @@ begin
   Changed;
 end;
 
-function TGraph.Connect(A, B: TPoint): TConnection;
+function TGraphEditable.Connect(A, B: TPoint): TConnection;
 begin
-  Result := A.Connect(B);
+  Result := TConnection(ConnectX(A, B));
 end;
 
-function TGraph.Copy: TGraph;
+function TGraphEditable.ConnectX(A, B: TGraph.TPoint): TGraph.TConnection;
+begin
+  Result := TConnection.Create(Self, TPoint(A), TPoint(B));
+  FConnections.Add(Result);
+end;
+
+function TGraph.Copy: TGraphEditable;
+begin
+  Result := TGraphEditable.Create;
+  Result.Assign(Self);
+end;
+
+procedure TGraphEditable.DefineJStorage(ASerializer: TJSerializer);
+begin
+  DoDefineJStorage(ASerializer);
+end;
+
+function TGraphEditable.GetConnections: TConnections.TReader;
+begin
+  Result := TConnections.TReader(inherited GetConnections);
+end;
+
+function TGraphEditable.GetFinishPoint: TPoint;
+begin
+  Result := TPoint(inherited FinishPoint);
+end;
+
+function TGraphEditable.GetPoints: TPoints.TReader;
+begin
+  Result := TPoints.TReader(inherited GetPoints);
+end;
+
+function TGraphEditable.GetStartPoint: TPoint;
+begin
+  Result := TPoint(inherited StartPoint);
+end;
+
+function TGraphEditable.OnChange: TEvent.TAccess;
+begin
+  Result := FOnChange.Access;
+end;
+
+procedure TGraphEditable.Clear;
+begin
+  inherited Clear;
+end;
+
+function TGraph.ConnectX(A, B: TPoint): TConnection;
+begin
+  Result := TConnection.Create(Self, A, B);
+  FConnections.Add(Result);
+end;
+
+function TGraph.CopyReadonly: TGraph;
 begin
   Result := TGraph.Create;
   Result.Assign(Self);
@@ -358,11 +586,11 @@ end;
 
 constructor TGraph.Create;
 begin
-  FPoints := TPoints.Create;
-  FConnections := TConnections.Create;
+  FPoints := TPoints.Create(True);
+  FConnections := TConnections.Create(True);
 end;
 
-procedure TGraph.DefineJStorage(ASerializer: TJSerializer);
+procedure TGraph.DoDefineJStorage(ASerializer: TJSerializer);
 var
   Point: TPoint;
   Connection: TConnection;
@@ -407,7 +635,7 @@ begin
         Clear;
 
         for JPoint in ASerializer.Value['points'].AsArray do
-          AddPoint(Vec2(JPoint[0], JPoint[1]));
+          AddPointX(Vec2(JPoint[0], JPoint[1]));
 
         for JConnection in ASerializer.Value['connections'].AsArray do
         begin
@@ -415,9 +643,9 @@ begin
             JPoints := JConnection['points']
           else
             JPoints := JConnection;
-          Connection := Connect(Points[JPoints[0]], Points[JPoints[1]]);
+          Connection := ConnectX(Points[JPoints[0]], Points[JPoints[1]]);
           if JConnection.IsObject then
-            Connection.CostFactor := JConnection['cost'];
+            Connection.SetCostFactor(JConnection['cost']);
         end;
 
         if ASerializer.Value.Get('start', JPointIndex) then
@@ -428,9 +656,15 @@ begin
   end;
 end;
 
+procedure TGraph.DefineJStorage(ASerializer: TJSerializer);
+begin
+  if ASerializer.IsLoading then
+    raise Exception.Create('Cannot load readonly graph.');
+  DoDefineJStorage(ASerializer);
+end;
+
 destructor TGraph.Destroy;
 begin
-  Clear;
   FConnections.Free;
   FPoints.Free;
   inherited;
@@ -451,9 +685,37 @@ begin
   Result := FPoints.Reader;
 end;
 
-function TGraph.OnChange: TEvent.TAccess;
+function TGraph.HasFinish: Boolean;
 begin
-  Result := FOnChange.Access;
+  Result := FinishPoint <> nil;
+end;
+
+function TGraph.HasStart: Boolean;
+begin
+  Result := StartPoint <> nil;
+end;
+
+function TGraph.Valid: Boolean;
+begin
+  Result := HasStart and HasFinish;
+end;
+
+procedure TGraph.Remove(AConnection: TConnection);
+var
+  I: Integer;
+begin
+  for I := AConnection.Index to Connections.MaxIndex do
+    Dec(FConnections[I].FIndex);
+  FConnections.RemoveAt(AConnection.Index);
+end;
+
+procedure TGraph.Remove(APoint: TPoint);
+var
+  I: Integer;
+begin
+  for I := APoint.Index + 1 to Points.MaxIndex do
+    Dec(FPoints[I].FIndex);
+  FPoints.RemoveAt(APoint.Index);
 end;
 
 procedure TGraph.SetFinishPoint(const Value: TPoint);
@@ -472,67 +734,19 @@ begin
   Changed;
 end;
 
-{ TGraph.TConnection }
-
-function TGraph.TConnection.AnyIs(APoint: TPoint): Boolean;
+procedure TGraphEditable.SetFinishPoint(const Value: TPoint);
 begin
-  Result := (APoint = PointA) or (APoint = PointB);
+  inherited SetFinishPoint(Value);
 end;
 
-constructor TGraph.TConnection.Create(AGraph: TGraph; APointA, APointB: TPoint);
+procedure TGraphEditable.SetStartPoint(const Value: TPoint);
 begin
-  FGraph := AGraph;
-  FPointA := APointA;
-  FPointB := APointB;
-  FCostFactor := 1;
-  Graph.FConnections.Add(Self);
-  PointA.FConnections.Add(Self);
-  PointB.FConnections.Add(Self);
-  Graph.Changed;
+  inherited SetStartPoint(Value);
 end;
 
-destructor TGraph.TConnection.Destroy;
-begin
-  if Graph <> nil then
-  begin
-    PointA.FConnections.Remove(Self);
-    PointB.FConnections.Remove(Self);
-    Graph.FConnections.Remove(Self);
-    Graph.Changed;
-  end;
-  inherited;
-end;
+{ TGraphEditable.TGridGenerator }
 
-function TGraph.TConnection.GetCost: Single;
-begin
-  Result := PointA.Pos.DistanceTo(PointB.Pos) * CostFactor;
-end;
-
-function TGraph.TConnection.GetIndex: Integer;
-begin
-  Result := Graph.Connections.Find(Self);
-end;
-
-function TGraph.TConnection.GetOnChange: TConnection.TEvent.TAccess;
-begin
-  Result := FOnChange.Access;
-end;
-
-function TGraph.TConnection.Other(APoint: TPoint): TPoint;
-begin
-  if APoint = PointA then
-    Exit(PointB);
-  Result := PointA;
-end;
-
-procedure TGraph.TConnection.SetCostFactor(const Value: Single);
-begin
-  FCostFactor := Value;
-end;
-
-{ TGraph.TGridGenerator }
-
-procedure TGraph.TGridGenerator.Generate;
+procedure TGraphEditable.TGridGenerator.Generate;
 var
   P: TIntVector2;
   I: Integer;
@@ -550,16 +764,16 @@ begin
     Graph.Points[I].Connect(Graph.Points[I + Size.X]);
 end;
 
-{ TGraph.TGenerator }
+{ TGraphEditable.TGenerator }
 
-constructor TGraph.TGenerator.Create(AGraph: TGraph);
+constructor TGraphEditable.TGenerator.Create(AGraph: TGraphEditable);
 begin
   FGraph := AGraph;
 end;
 
-{ TGraph.TRandomPointGenerator }
+{ TGraphEditable.TRandomPointGenerator }
 
-procedure TGraph.TRandomPointGenerator.Generate;
+procedure TGraphEditable.TRandomPointGenerator.Generate;
 var
   I: Integer;
 begin

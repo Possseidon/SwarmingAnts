@@ -31,11 +31,13 @@ uses
   Pengine.Utility,
   Pengine.JSON,
   Pengine.Collections,
+  Pengine.IntMaths,
 
   DisplayView,
   GraphDefine,
   MiniDialogGenerateGrid,
-  AntDefine;
+  AntDefine,
+  Vcl.Grids;
 
 type
 
@@ -102,7 +104,6 @@ type
     gbPopulation: TGroupBox;
     seBatch: TSpinEdit;
     lbBatch: TLabel;
-    lbTodoBatchStatistics: TLabel;
     gbStatistics: TGroupBox;
     lbTodoChart: TLabel;
     splStatistics: TSplitter;
@@ -118,6 +119,9 @@ type
     edtInfluenceFactor: TEdit;
     Label2: TLabel;
     lvAnts: TListView;
+    btnHidePath: TButton;
+    actHidePath: TAction;
+    sgStatistics: TStringGrid;
     procedure actClearExecute(Sender: TObject);
     procedure actConnectionToolExecute(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -134,6 +138,8 @@ type
     procedure actSaveAsExecute(Sender: TObject);
     procedure actGenerateExecute(Sender: TObject);
     procedure actGenerateUpdate(Sender: TObject);
+    procedure actHidePathExecute(Sender: TObject);
+    procedure actHidePathUpdate(Sender: TObject);
     procedure actStartExecute(Sender: TObject);
     procedure actStartToolExecute(Sender: TObject);
     procedure actStartUpdate(Sender: TObject);
@@ -146,10 +152,10 @@ type
       Integer; var Compare: Integer);
     procedure lvAntsSelectItem(Sender: TObject; Item: TListItem; Selected: Boolean);
     procedure seBatchChange(Sender: TObject);
+    procedure seBatchExit(Sender: TObject);
     procedure seBatchSizeExit(Sender: TObject);
     procedure tmrUpdateTimer(Sender: TObject);
   private
-    FBackupGraph: TGraph;
     FDisplay: TDisplay;
     FSimulation: TSimulation;
     FSortColumn: Integer;
@@ -159,15 +165,15 @@ type
     function GetSimulationDisplay: TSimulationDisplay;
     function GetEditable: Boolean;
     procedure SetEditable(const Value: Boolean);
-    function GetPheromoneMap: TPheromoneMap;
-    procedure SyncSimulationData;
+    function GetPheromoneData: TPheromoneData;
 
+    procedure SyncSimulationData;
     procedure GenerateAntList;
 
   public
     property EditorDisplay: TEditorDisplay read GetEditorDisplay;
     property SimulationDisplay: TSimulationDisplay read GetSimulationDisplay;
-    property PheromoneMap: TPheromoneMap read GetPheromoneMap;
+    property PheromoneData: TPheromoneData read GetPheromoneData;
 
     property Editable: Boolean read GetEditable write SetEditable;
 
@@ -193,7 +199,6 @@ end;
 
 procedure TfrmMain.FormDestroy(Sender: TObject);
 begin
-  FBackupGraph.Free;
   FSimulation.Free;
   FDisplay.Free;
 end;
@@ -203,6 +208,11 @@ begin
   Editable := False;
   DisplayToolChange;
   SyncSimulationData;
+
+  sgStatistics.Cells[0, 0] := 'Best';
+  sgStatistics.Cells[1, 0] := 'Worst';
+  sgStatistics.Cells[2, 0] := 'Average';
+  sgStatistics.Cells[3, 0] := 'Median';
 end;
 
 procedure TfrmMain.actEditorActiveExecute(Sender: TObject);
@@ -228,24 +238,29 @@ end;
 procedure TfrmMain.actOpenExecute(Sender: TObject);
 var
   JGraph: TJObject;
+  Graph: TGraphEditable;
 begin
   if not dlgOpen.Execute then
     Exit;
 
-  JGraph := TJObject.CreateFromFile(dlgOpen.FileName);
+  Graph := nil;
+  JGraph := nil;
+
   try
-    TJSerializer.Unserialize(FBackupGraph, JGraph);
+    Graph := TGraphEditable.Create;
+    JGraph := TJObject.CreateFromFile(dlgOpen.FileName);
+
+    TJSerializer.Unserialize(Graph, JGraph);
 
     if Editable then
     begin
-      EditorDisplay.Graph := FBackupGraph;
+      EditorDisplay.Graph := Graph;
     end
     else
     begin
-      FDisplay.Free;
-      FDisplay := TSimulationDisplay.Create(pbDisplay, FBackupGraph);
       FSimulation.Free;
-      FSimulation := TSimulation.Create(SimulationDisplay.PheromoneMap);
+      FSimulation := TSimulation.Create(Graph);
+      SimulationDisplay.PheromoneData := FSimulation.PheromoneData;
       SyncSimulationData;
     end;
 
@@ -253,8 +268,11 @@ begin
 
   finally
     JGraph.Free;
+    Graph.Free;
 
   end;
+
+  TPath.GetInvalidFileNameChars
 end;
 
 procedure TfrmMain.actSelectionToolExecute(Sender: TObject);
@@ -269,7 +287,13 @@ end;
 
 procedure TfrmMain.actResetExecute(Sender: TObject);
 begin
+  SimulationDisplay.VisibleAnt := nil;
+  seBatch.MaxValue := 1;
+  seBatch.Value := 1;
+  seBatch.Enabled := False;
   FSimulation.Clear;
+  SyncSimulationData;
+  GenerateAntList;
   pbDisplay.Invalidate;
 end;
 
@@ -280,18 +304,12 @@ end;
 
 procedure TfrmMain.actSaveAsExecute(Sender: TObject);
 var
-  Graph: IJSerializable;
   Serialized: TJObject;
 begin
   if not dlgSave.Execute then
     Exit;
 
-  if Editable then
-    Graph := EditorDisplay.Graph
-  else
-    Graph := FBackupGraph;
-
-  Serialized := TJSerializer.Serialize(Graph);
+  Serialized := TJSerializer.Serialize(EditorDisplay.Graph);
   try
     ForceDirectories(ExtractFilePath(dlgSave.FileName));
     Serialized.SaveToFile(dlgSave.FileName);
@@ -314,7 +332,17 @@ end;
 
 procedure TfrmMain.actGenerateUpdate(Sender: TObject);
 begin
-  actGenerate.Enabled := PheromoneMap.Valid;
+  actGenerate.Enabled := PheromoneData.Graph.Valid;
+end;
+
+procedure TfrmMain.actHidePathExecute(Sender: TObject);
+begin
+  SimulationDisplay.VisibleAnt := nil;
+end;
+
+procedure TfrmMain.actHidePathUpdate(Sender: TObject);
+begin
+  actHidePath.Enabled := not Editable and (SimulationDisplay.VisibleAnt <> nil);
 end;
 
 procedure TfrmMain.actStartExecute(Sender: TObject);
@@ -329,7 +357,7 @@ end;
 
 procedure TfrmMain.actStartUpdate(Sender: TObject);
 begin
-  actStart.Enabled := PheromoneMap.Valid;
+  actStart.Enabled := PheromoneData.Graph.Valid;
   if tmrUpdate.Enabled then
     actStart.Caption := 'Stop'
   else
@@ -354,8 +382,8 @@ begin
   if FSimulation = nil then
     Exit;
   if Single.TryParse(edtInfluenceFactor.Text, Value, TFormatSettings.Invariant) then
-    PheromoneMap.InfluencedFactor := EnsureRange(Value / 100, 0, 1);
-  edtInfluenceFactor.Text := PrettyFloat(Single(PheromoneMap.InfluencedFactor * 100));
+    FSimulation.InfluencedFactor := EnsureRange(Value / 100, 0, 1);
+  edtInfluenceFactor.Text := PrettyFloat(Single(FSimulation.InfluencedFactor * 100));
 end;
 
 procedure TfrmMain.edtPheromoneDissipationExit(Sender: TObject);
@@ -365,8 +393,8 @@ begin
   if FSimulation = nil then
     Exit;
   if Single.TryParse(edtPheromoneDissipation.Text, Value, TFormatSettings.Invariant) then
-    PheromoneMap.PheromoneDissipation := EnsureRange(Value / 100, 0, 1);
-  edtPheromoneDissipation.Text := PrettyFloat(Single(PheromoneMap.PheromoneDissipation * 100));
+    FSimulation.PheromoneDissipation := EnsureRange(Value / 100, 0, 1);
+  edtPheromoneDissipation.Text := PrettyFloat(Single(FSimulation.PheromoneDissipation * 100));
 end;
 
 procedure TfrmMain.FormMouseWheel(Sender: TObject; Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint;
@@ -385,12 +413,28 @@ var
   Batch: TSimulation.TBatch;
   I: Integer;
   Item: TListItem;
+  S: TSimulation.TStatisticType;
+  Stats: TSimulation.TStatistic;
 begin
+  SimulationDisplay.PheromoneData := FSimulation.PheromoneData;
+
+  if FSimulation.Batches.Empty then
+  begin
+    for S := Low(TSimulation.TStatisticType) to High(TSimulation.TStatisticType) do
+      sgStatistics.Cells[Ord(S), 1] := '-';
+  end
+  else
+  begin
+    Stats := FSimulation.Batches.Last.GetPathLengthStatistic;
+    for S := Low(TSimulation.TStatisticType) to High(TSimulation.TStatisticType) do
+      sgStatistics.Cells[Ord(S), 1] := Round(Stats[S]).ToString;
+  end;
+
   lvAnts.Items.BeginUpdate;
   try
     lvAnts.Items.Clear;
 
-    if FSimulation = nil then
+    if FSimulation.Batches.Empty then
       Exit;
 
     Batch := FSimulation.Batches[seBatch.Value - 1];
@@ -400,7 +444,7 @@ begin
       Item.Caption := (I + 1).ToString;
       Item.Data := Batch.Ants[I];
       if Batch.Ants[I].Success then
-        Item.SubItems.Add(PrettyFloat(Batch.Ants[I].PathLength))
+        Item.SubItems.Add(Round(Batch.Ants[I].PathLength).ToString)
       else
         Item.SubItems.Add('failed');
     end;
@@ -421,9 +465,9 @@ begin
   Result := FDisplay as TEditorDisplay;
 end;
 
-function TfrmMain.GetPheromoneMap: TPheromoneMap;
+function TfrmMain.GetPheromoneData: TPheromoneData;
 begin
-  Result := SimulationDisplay.PheromoneMap;
+  Result := FSimulation.PheromoneData;
 end;
 
 procedure TfrmMain.SyncSimulationData;
@@ -472,14 +516,27 @@ var
 begin
   Ant := Item.Data;
   if Selected then
-    SimulationDisplay.ShowAntPath(Ant)
+    SimulationDisplay.VisibleAnt := Ant
   else
-    SimulationDisplay.HideAntPath;
+    SimulationDisplay.VisibleAnt := nil;
 end;
 
 procedure TfrmMain.seBatchChange(Sender: TObject);
+var
+  Batch: Integer;
 begin
-  GenerateAntList;
+  if not Integer.TryParse(seBatch.Text, Batch) then
+    Exit;
+  if FSimulation.Batches.RangeCheck(Batch - 1) then
+    GenerateAntList;
+end;
+
+procedure TfrmMain.seBatchExit(Sender: TObject);
+var
+  Batch: Integer;
+begin
+  if not Integer.TryParse(seBatch.Text, Batch) then
+    seBatch.Value := 1;
 end;
 
 procedure TfrmMain.seBatchSizeExit(Sender: TObject);
@@ -497,15 +554,21 @@ end;
 procedure TfrmMain.SetEditable(const Value: Boolean);
 var
   Camera: TCamera;
+  Graph: TGraphEditable;
 begin
-  if (FDisplay <> nil) then
+  if FDisplay <> nil then
   begin
     if Editable = Value then
       Exit;
     Camera := FDisplay.Camera.Copy;
+    Graph := FDisplay.Graph.Copy;
   end
   else
+  begin
     Camera := nil;
+    // default graph
+    Graph := TGraphEditable.Create;
+  end;
 
   if Value then
   begin
@@ -513,20 +576,18 @@ begin
     FDisplay.Free;
     FDisplay := TEditorDisplay.Create(pbDisplay);
     EditorDisplay.OnToolChange.Add(DisplayToolChange);
-    EditorDisplay.Graph := FBackupGraph;
+    EditorDisplay.Graph := Graph;
   end
   else
   begin
-    FBackupGraph.Free;
-    if Editable then
-      FBackupGraph := EditorDisplay.Graph.Copy
-    else
-      FBackupGraph := TGraph.Create; // TODO: Default loading
     FDisplay.Free;
-    FDisplay := TSimulationDisplay.Create(pbDisplay, FBackupGraph);
-    FSimulation := TSimulation.Create(SimulationDisplay.PheromoneMap);
+    FDisplay := TSimulationDisplay.Create(pbDisplay);
+    FSimulation := TSimulation.Create(Graph);
+    SimulationDisplay.PheromoneData := FSimulation.PheromoneData;
     SyncSimulationData;
   end;
+
+  Graph.Free;
 
   if Camera <> nil then
   begin
