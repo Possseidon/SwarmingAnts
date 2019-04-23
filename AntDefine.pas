@@ -47,12 +47,15 @@ type
 
     TPath = TRefArray<TGraph.TConnection>;
 
+    TPoints = TRefArray<TGraph.TPoint>;
+
   private
     FPheromoneData: TPheromoneData;
     FPassedPoints: TBitfield;
     FInfluencedFactor: Single;
     FSuccess: Boolean;
     FPath: TPath;
+    FPoints: TPoints;
     FPathLength: Single;
 
     function GetPheromoneAmount: Single;
@@ -61,6 +64,7 @@ type
     function ChooseConnection(APoint: TGraph.TPoint; out AConnection: TGraph.TConnection): Boolean;
     function GetGraph: TGraph;
     function GetPath: TPath.TReader;
+    function GetPoints: TPoints.TReader;
 
   public
     constructor Create(APheromoneData: TPheromoneData);
@@ -74,6 +78,7 @@ type
 
     /// <summary>The full path of points, that this ant took.</summary>
     property Path: TPath.TReader read GetPath;
+    property Points: TPoints.TReader read GetPoints;
     /// <returns>Whether the ant passed over the given point.</returns>
     function PassedPoint(APoint: TGraph.TPoint): Boolean;
     /// <summary>The total length of the path.</summary>
@@ -140,7 +145,6 @@ type
 
     function GetBatches: TBatches.TReader;
     function GetPheromoneData: TPheromoneData;
-    function GetGraph: TGraph;
 
   public
     constructor Create(AGraph: TGraph);
@@ -172,10 +176,12 @@ begin
   FPheromoneData := APheromoneData;
   FPassedPoints := TBitfield.Create(Graph.Connections.Count);
   FPath := TPath.Create;
+  FPoints := TPoints.Create;
 end;
 
 destructor TAnt.Destroy;
 begin
+  FPoints.Free;
   FPath.Free;
   FPassedPoints.Free;
   inherited;
@@ -251,6 +257,7 @@ var
   Connection: TGraph.TConnection;
 begin
   Current := Graph.StartPoint;
+  FPoints.Add(Current);
   FPassedPoints[Current.Index] := True;
   while Current <> Graph.FinishPoint do
   begin
@@ -258,6 +265,7 @@ begin
     begin
       FPath.Add(Connection);
       Current := Connection.Other(Current);
+      FPoints.Add(Current);
       FPassedPoints[Current.Index] := True;
     end
     else
@@ -265,6 +273,7 @@ begin
       if Path.Empty then
         Break;
       Current := FPath.Last.Other(Current);
+      FPoints.RemoveLast;
       FPath.RemoveLast;
     end;
   end;
@@ -290,6 +299,11 @@ begin
     Result := Power(1.01, -PathLength)
   else
     Result := 0;
+end;
+
+function TAnt.GetPoints: TPoints.TReader;
+begin
+  Result := FPoints.Reader;
 end;
 
 procedure TAnt.LeaveTrail;
@@ -331,11 +345,6 @@ end;
 function TSimulation.GetBatches: TBatches.TReader;
 begin
   Result := FBatches.Reader;
-end;
-
-function TSimulation.GetGraph: TGraph;
-begin
-  Result := FInitialPheromoneData.Graph;
 end;
 
 function TSimulation.GetPheromoneData: TPheromoneData;

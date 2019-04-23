@@ -179,9 +179,7 @@ type
     FVisibleAnt: TAnt;
 
     procedure SetPheromoneData(const Value: TPheromoneData);
-    procedure HideAntPath;
     procedure SetVisibleAnt(const Value: TAnt);
-    procedure ShowAntPath(AAnt: TAnt);
 
   protected
     function GetGraph: TGraph; override;
@@ -345,7 +343,10 @@ end;
 procedure TEditorDisplay.Drag(AAmount: TVector2);
 begin
   if Tool = etConnection then
-    FConnectionDrag := FConnectionDrag + AAmount
+  begin
+    FConnectionDrag := FConnectionDrag + AAmount / FCamera.Scale;
+    PaintBox.Invalidate;
+  end
   else if FPointAtCursor <> nil then
     FPointAtCursor.Pos := FPointAtCursor.Pos + AAmount / FCamera.Scale
   else
@@ -543,9 +544,8 @@ end;
 procedure TDisplay.PaintBoxMouseMove(Sender: TObject; Shift: TShiftState; X, Y: Integer);
 begin
   if FCamDrag.HasValue then
-    UpdateMouseDrag(Vec2(X, Y))
-  else
-    UpdateMouseHover(Vec2(X, Y));
+    UpdateMouseDrag(Vec2(X, Y));
+  UpdateMouseHover(Vec2(X, Y));
 end;
 
 procedure TDisplay.PaintBoxMouseUp(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Integer);
@@ -674,12 +674,6 @@ begin
   Result := PheromoneData.Graph;
 end;
 
-procedure TSimulationDisplay.HideAntPath;
-begin
-  FVisibleAnt := nil;
-  PaintBox.Invalidate;
-end;
-
 procedure TSimulationDisplay.Paint(G: IGPGraphics);
 var
   Pen: IGPPen;
@@ -691,6 +685,8 @@ var
   StartFinishBrush: IGPSolidBrush;
   Rect: TGPRectF;
   Point: TGraph.TPoint;
+  AntPath: array of TGPPointF;
+  I: Integer;
 begin
   MaxPheromones := 0;
   for Connection in PheromoneData.Graph.Connections do
@@ -726,9 +722,10 @@ begin
     end;
   end;
 
-  if FVisibleAnt <> nil then
+  {
+  if VisibleAnt <> nil then
   begin
-    if FVisibleAnt.Success then
+    if VisibleAnt.Success then
       Pen := TGPPen.Create(TGPColor.Blue, LineWidth * 1.5)
     else
       Pen := TGPPen.Create(TGPColor.Red, LineWidth * 1.5);
@@ -737,19 +734,24 @@ begin
         G.DrawLine(Pen, PointA.Pos.X, PointA.Pos.Y, PointB.Pos.X,
           PointB.Pos.Y);
   end;
-
-  {
-  if (FAnt <> nil) and not FAnt.Path.Empty then
+  }
+  if (VisibleAnt <> nil) and not VisibleAnt.Path.Empty then
   begin
-    SetLength(AntPath, FAnt.Path.Count + 1);
-    for I := 0 to FAnt.Path.MaxIndex do
-      AntPath[I] := TGPPointF(FAnt.Path[I].PointA.Pos);
-    AntPath[FAnt.Path.MaxIndex + 1] := TGPPointF(FAnt.Path.Last.PointB.Pos);
+    if VisibleAnt.Success then
+      Pen := TGPPen.Create($FF0000FF, LineWidth * 1.5)
+    else
+      Pen := TGPPen.Create($FFFF0000, LineWidth * 1.5);
 
-    Pen := TGPPen.Create(TGPColor.Blue, LineWidth * 1.5);
-    G.DrawCurve(Pen, AntPath, 0.9);
+    SetLength(AntPath, VisibleAnt.Points.Count);
+    for I := 0 to VisibleAnt.Points.MaxIndex do
+      AntPath[I] := TGPPointF(VisibleAnt.Points[I].Pos);
+
+    Pen.LineJoin := LineJoinRound;
+    Pen.StartCap := LineCapRoundAnchor;
+    Pen.EndCap := LineCapArrowAnchor;
+    G.DrawLines(Pen, AntPath);
   end;
-   }
+
 end;
 
 procedure TSimulationDisplay.SetPheromoneData(const Value: TPheromoneData);
@@ -763,12 +765,6 @@ end;
 procedure TSimulationDisplay.SetVisibleAnt(const Value: TAnt);
 begin
   FVisibleAnt := Value;
-  PaintBox.Invalidate;
-end;
-
-procedure TSimulationDisplay.ShowAntPath(AAnt: TAnt);
-begin
-  FVisibleAnt := AAnt;
   PaintBox.Invalidate;
 end;
 

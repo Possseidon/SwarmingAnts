@@ -122,6 +122,10 @@ type
     btnHidePath: TButton;
     actHidePath: TAction;
     sgStatistics: TStringGrid;
+    ToolButton1: TToolButton;
+    ToolButton2: TToolButton;
+    actTriangulate: TAction;
+    actTriangulateDelaunay: TAction;
     procedure actClearExecute(Sender: TObject);
     procedure actConnectionToolExecute(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -242,6 +246,8 @@ var
 begin
   if not dlgOpen.Execute then
     Exit;
+
+  actResetExecute(nil);
 
   Graph := nil;
   JGraph := nil;
@@ -572,6 +578,7 @@ begin
 
   if Value then
   begin
+    actResetExecute(nil);
     FreeAndNil(FSimulation);
     FDisplay.Free;
     FDisplay := TEditorDisplay.Create(pbDisplay);

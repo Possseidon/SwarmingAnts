@@ -5,13 +5,14 @@ interface
 uses
   System.SysUtils,
 
+  Pengine.Bitfield,
   Pengine.EventHandling,
   Pengine.Vector,
   Pengine.Collections,
   Pengine.IntMaths,
   Pengine.Interfaces,
   Pengine.JSON,
-  Pengine.Utility;
+  Pengine.Utility, System.Math;
 
 type
 
@@ -203,7 +204,7 @@ type
       FGraph: TGraphEditable;
 
     public
-      constructor Create(AGraph: TGraphEditable);
+      constructor Create(AGraph: TGraphEditable); virtual;
 
       property Graph: TGraphEditable read FGraph;
 
@@ -234,6 +235,24 @@ type
       property Bounds: TBounds2 read FBounds write FBounds;
       property Count: Integer read FCount write FCount;
 
+      procedure Generate; override;
+
+    end;
+
+    TTriangulator = class(TGenerator)
+    private
+      // Outline is CCW
+      FOutline: TPoints;
+
+      procedure AddToOutline(APoint: TPoint);
+      
+      procedure GenerateOutline;
+      procedure Triangulate;
+      
+    public
+      constructor Create(AGraph: TGraphEditable); override;
+      destructor Destroy; override;
+      
       procedure Generate; override;
 
     end;
@@ -779,6 +798,79 @@ var
 begin
   for I := 0 to Count - 1 do
     Graph.AddPoint(Bounds.InvPoint[TVector2.Random]);
+end;
+
+{ TGraphEditable.TTriangulator }
+
+procedure TGraphEditable.TTriangulator.AddToOutline(APoint: TPoint);
+var
+  I: Integer;
+  A, B: TPoint;
+  Line: TLine2;
+begin
+  for I := 0 to FOutline.MaxIndex do
+  begin
+    A := FOutline[I];
+    B := FOutline[(I + 1) mod FOutline.Count];
+    Line := A.Pos.LineTo(B);
+
+    Line.Side(APoint.Pos);
+  end;
+end;
+
+constructor TGraphEditable.TTriangulator.Create(AGraph: TGraphEditable);
+begin
+  inherited;
+  FOutline := TPoints.Create;  
+end;
+
+destructor TGraphEditable.TTriangulator.Destroy;
+begin
+  FOutline.Free;  
+  inherited;
+end;
+
+procedure TGraphEditable.TTriangulator.Generate;
+begin
+  if Graph.Points.Count = 2 then
+    Graph.Points[0].Connect(Graph.Points[1])
+  else if Graph.Points.Count >= 3 then
+  begin
+    GenerateOutline;
+    Triangulate;    
+  end;
+end;
+
+procedure TGraphEditable.TTriangulator.GenerateOutline;
+var
+  I: Integer;
+  Side: TLineSide;
+begin
+  // Choose two arbirary points
+  FOutline.Add(Graph.Points[0]);
+  Side := Graph.Points[0].Pos.LineTo(Graph.Points[1]).Side(Graph.Points[2]);
+  if Side = lsLeft then
+  begin    
+    FOutline.Add(Graph.Points[1]);
+    FOutline.Add(Graph.Points[2]);
+  end
+  else
+  begin
+    FOutline.Add(Graph.Points[1]);
+    FOutline.Add(Graph.Points[2]);  
+  end;
+  FOutline[0].Connect(FOutline[1]);
+  FOutline[1].Connect(FOutline[2]);
+  FOutline[2].Connect(FOutline[0]);
+
+  // Integegrate all other points
+  for I := 3 to Graph.Points.MaxIndex do
+    AddToOutline(Graph.Points[I]);  
+end;
+
+procedure TGraphEditable.TTriangulator.Triangulate;
+begin
+
 end;
 
 end.
