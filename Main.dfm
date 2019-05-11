@@ -558,11 +558,13 @@ object frmMain: TfrmMain
       Category = 'Editor'
       Caption = 'Traingulieren'
       ImageIndex = 7
+      OnExecute = actTriangulateExecute
     end
     object actTriangulateDelaunay: TAction
       Category = 'Editor'
       Caption = 'Delaunay Triangulieren'
       ImageIndex = 8
+      OnExecute = actTriangulateDelaunayExecute
     end
   end
   object ilIcons: TImageList

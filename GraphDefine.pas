@@ -12,7 +12,8 @@ uses
   Pengine.IntMaths,
   Pengine.Interfaces,
   Pengine.JSON,
-  Pengine.Utility, System.Math;
+  Pengine.Utility,
+  System.Math;
 
 type
 
@@ -245,20 +246,23 @@ type
       FOutline: TPoints;
 
       procedure AddToOutline(APoint: TPoint);
-      
+
       procedure GenerateOutline;
+      procedure GenerateOutline2;
       procedure Triangulate;
-      
+
     public
       constructor Create(AGraph: TGraphEditable); override;
       destructor Destroy; override;
-      
+
       procedure Generate; override;
 
     end;
 
     TDelaunayTriangulator = class(TGenerator)
-
+    public
+      procedure Generate; override;
+      
     end;
 
   private
@@ -511,11 +515,13 @@ function TGraphEditable.AddPointX(APos: TVector2): TGraph.TPoint;
 begin
   Result := TPoint.Create(Self, APos);
   FPoints.Add(Result);
+  Changed;
 end;
 
 procedure TGraphEditable.Assign(AFrom: TGraph);
 begin
   inherited;
+  Changed;
 end;
 
 procedure TGraphEditable.Changed;
@@ -546,8 +552,11 @@ end;
 
 function TGraphEditable.ConnectX(A, B: TGraph.TPoint): TGraph.TConnection;
 begin
+  if A.IsConnected(B) then
+    Exit(A.FindConnection(B));
   Result := TConnection.Create(Self, TPoint(A), TPoint(B));
   FConnections.Add(Result);
+  Changed;
 end;
 
 function TGraph.Copy: TGraphEditable;
@@ -559,6 +568,8 @@ end;
 procedure TGraphEditable.DefineJStorage(ASerializer: TJSerializer);
 begin
   DoDefineJStorage(ASerializer);
+  if ASerializer.IsLoading then
+    Changed;
 end;
 
 function TGraphEditable.GetConnections: TConnections.TReader;
@@ -589,10 +600,13 @@ end;
 procedure TGraphEditable.Clear;
 begin
   inherited Clear;
+  Changed;
 end;
 
 function TGraph.ConnectX(A, B: TPoint): TConnection;
 begin
+  if A.IsConnected(B) then
+    Exit(A.FindConnection(B));
   Result := TConnection.Create(Self, A, B);
   FConnections.Add(Result);
 end;
@@ -797,36 +811,67 @@ var
   I: Integer;
 begin
   for I := 0 to Count - 1 do
-    Graph.AddPoint(Bounds.InvPoint[TVector2.Random]);
+    Graph.AddPoint(Bounds[TVector2.Random]);
 end;
 
 { TGraphEditable.TTriangulator }
 
 procedure TGraphEditable.TTriangulator.AddToOutline(APoint: TPoint);
 var
-  I: Integer;
+  I, MinI: Integer;
   A, B: TPoint;
   Line: TLine2;
+  S, MinS, NewS: Single;
+  After: Boolean;
 begin
+  MinS := Infinity;
+  MinI := -1;
+  After := False;
   for I := 0 to FOutline.MaxIndex do
   begin
     A := FOutline[I];
     B := FOutline[(I + 1) mod FOutline.Count];
-    Line := A.Pos.LineTo(B);
+    Line := A.Pos.LineTo(B.Pos);
 
-    Line.Side(APoint.Pos);
+    if Line.Side(APoint.Pos) <> lsRight then
+      Continue;
+
+    S := Line.OrthoProj(APoint.Pos);
+    if S in Bounds1(0, 1) then
+    begin
+      // Insert point
+      FOutline.Insert(APoint, I);
+      Exit;
+    end;
+
+    NewS := Min(Abs(S), Abs(S - 1));
+    if NewS < MinS then
+    begin
+      MinI := I;
+      MinS := NewS;
+      After := Abs(S - 1) > Abs(S);
+    end;
   end;
+
+  if MinI = -1 then
+    Exit;
+
+  if After then
+    FOutline[(MinI + 1) mod FOutline.Count] := APoint
+  else
+    FOutline[MinI] := APoint;
+
 end;
 
 constructor TGraphEditable.TTriangulator.Create(AGraph: TGraphEditable);
 begin
   inherited;
-  FOutline := TPoints.Create;  
+  FOutline := TPoints.Create;
 end;
 
 destructor TGraphEditable.TTriangulator.Destroy;
 begin
-  FOutline.Free;  
+  FOutline.Free;
   inherited;
 end;
 
@@ -836,8 +881,8 @@ begin
     Graph.Points[0].Connect(Graph.Points[1])
   else if Graph.Points.Count >= 3 then
   begin
-    GenerateOutline;
-    Triangulate;    
+    GenerateOutline2;
+    Triangulate;
   end;
 end;
 
@@ -848,29 +893,108 @@ var
 begin
   // Choose two arbirary points
   FOutline.Add(Graph.Points[0]);
-  Side := Graph.Points[0].Pos.LineTo(Graph.Points[1]).Side(Graph.Points[2]);
+  Side := Graph.Points[0].Pos.LineTo(Graph.Points[1].Pos).Side(Graph.Points[2].Pos);
   if Side = lsLeft then
-  begin    
+  begin
     FOutline.Add(Graph.Points[1]);
     FOutline.Add(Graph.Points[2]);
   end
   else
   begin
     FOutline.Add(Graph.Points[1]);
-    FOutline.Add(Graph.Points[2]);  
+    FOutline.Add(Graph.Points[2]);
   end;
-  FOutline[0].Connect(FOutline[1]);
-  FOutline[1].Connect(FOutline[2]);
-  FOutline[2].Connect(FOutline[0]);
 
   // Integegrate all other points
   for I := 3 to Graph.Points.MaxIndex do
-    AddToOutline(Graph.Points[I]);  
+    AddToOutline(Graph.Points[I]);
+
+  for I := 0 to FOutline.MaxIndex do
+    FOutline[I].Connect(FOutline[(I + 1) mod FOutline.Count]);
+end;
+
+procedure TGraphEditable.TTriangulator.GenerateOutline2;
+var
+  A, B, C: TPoint;
+  Line: TLine2;
+  Side: TLineSide;
+  AllInside: Boolean;
+begin
+  for A in Graph.Points do
+  begin
+    for B in Graph.Points do
+    begin
+      if A = B then
+        Continue;
+    
+      Line := A.Pos.LineTo(B.Pos);
+      Side := lsOn;
+      for C in Graph.Points do
+      begin
+        if (C = A) or (C = B) then
+          Continue;
+      
+        if Side = lsOn then
+          Side := Line.Side(C.Pos)
+        else if Side <> Line.Side(C.Pos) then
+        begin
+          Side := lsOn;
+          Break;
+        end;
+      end;
+
+      if Side <> lsOn then
+        A.Connect(B);
+
+    end;
+  end;
 end;
 
 procedure TGraphEditable.TTriangulator.Triangulate;
 begin
 
+end;
+
+{ TGraphEditable.TDelaunayTriangulator }
+
+procedure TGraphEditable.TDelaunayTriangulator.Generate;
+var
+  A, B, C, D: TPoint;
+  Center: TVector2;
+  Radius: Single;
+  DelaunayMet: Boolean;
+begin
+  for A in Graph.Points do
+  begin
+    for B in Graph.Points do
+    begin
+      if A = B then
+        Continue;
+      for C in Graph.Points do
+      begin
+        if (C = A) or (C = B) then
+          Continue;
+        DelaunayMet := True;
+        for D in Graph.Points do
+        begin
+          if (D = A) or (D = B) or (D = C) then
+            Continue;
+          if D.Pos.InCircumcircle(A.Pos, B.Pos, C.Pos) then
+          begin
+            DelaunayMet := False;
+            Break;
+          end;
+        end;
+
+        if DelaunayMet then
+        begin
+          A.Connect(B);
+          B.Connect(C);
+          C.Connect(A);        
+        end;
+      end;
+    end;
+  end;
 end;
 
 end.

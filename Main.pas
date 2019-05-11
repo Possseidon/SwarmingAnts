@@ -147,6 +147,8 @@ type
     procedure actStartExecute(Sender: TObject);
     procedure actStartToolExecute(Sender: TObject);
     procedure actStartUpdate(Sender: TObject);
+    procedure actTriangulateDelaunayExecute(Sender: TObject);
+    procedure actTriangulateExecute(Sender: TObject);
     procedure edtInfluenceFactorExit(Sender: TObject);
     procedure edtPheromoneDissipationExit(Sender: TObject);
     procedure FormMouseWheel(Sender: TObject; Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint;
@@ -368,6 +370,32 @@ begin
     actStart.Caption := 'Stop'
   else
     actStart.Caption := 'Start';
+end;
+
+procedure TfrmMain.actTriangulateDelaunayExecute(Sender: TObject);
+var
+  Triangulator: TGraphEditable.TDelaunayTriangulator;
+begin
+  Triangulator := TGraphEditable.TDelaunayTriangulator.Create(EditorDisplay.Graph);
+  try
+    Triangulator.Generate;
+  finally
+    Triangulator.Free;
+  end;
+  pbDisplay.Invalidate;
+end;
+
+procedure TfrmMain.actTriangulateExecute(Sender: TObject);
+var
+  Generator: TGraphEditable.TTriangulator;
+begin
+  Generator := TGraphEditable.TTriangulator.Create(EditorDisplay.Graph);
+  try
+    Generator.Generate;
+  finally
+    Generator.Free;
+  end;
+  pbDisplay.Invalidate;
 end;
 
 procedure TfrmMain.DisplayToolChange;

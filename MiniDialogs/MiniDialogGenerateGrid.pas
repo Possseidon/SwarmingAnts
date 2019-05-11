@@ -75,11 +75,13 @@ procedure TmdlgGenerateGrid.FormClose(Sender: TObject; var Action: TCloseAction)
 begin
   if ModalResult = mrOk then
   begin
-    with TGraphEditable.TGridGenerator.Create(FGraph) do
+    with TGraphEditable.TRandomPointGenerator.Create(FGraph) do
     begin
       try
-        Size := IVec2(seWidth.Value, seHeight.Value);
-        Bounds := Bounds2(0).Outset(seDistance.Value * TVector2(Size));
+        // Size := IVec2(seWidth.Value, seHeight.Value);
+        // Bounds := Bounds2(0).Outset(seDistance.Value * TVector2(Size));
+        Count := 50;
+        Bounds := Bounds2(-300, 300);
         Generate;
 
       finally
@@ -95,8 +97,7 @@ begin
   Close;
 end;
 
-procedure TmdlgGenerateGrid.FormKeyDown(Sender: TObject; var Key: Word; Shift:
-  TShiftState);
+procedure TmdlgGenerateGrid.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 begin
   if Key = VK_ESCAPE then
     Close;
