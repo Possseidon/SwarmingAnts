@@ -431,8 +431,7 @@ begin
       begin
         if FPointAtCursor <> nil then
         begin
-          FPointAtCursor.IsFinish := True;
-          Tool := etSelection;
+          FPointAtCursor.HasFood := not FPointAtCursor.HasFood;
           FCamDrag.Clear;
           PaintBox.Invalidate;
         end;
@@ -507,7 +506,7 @@ begin
         G.FillEllipse(StartBrush, R);
       end;
 
-      if IsFinish then
+      if HasFood then
       begin
         R.Inflate(-PointSize * 0.15);
         G.FillEllipse(FinishBrush, R);
@@ -715,7 +714,7 @@ begin
     begin
       Rect.Initialize(Pos.X, Pos.Y, 0, 0);
       Rect.Inflate(PointSize / 2);
-      if IsStart or IsFinish then
+      if IsStart or HasFood then
         G.FillEllipse(StartFinishBrush, Rect)
       else
         G.FillEllipse(Brush, Rect);

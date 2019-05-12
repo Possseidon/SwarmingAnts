@@ -2,8 +2,8 @@ object frmMain: TfrmMain
   Left = 0
   Top = 0
   Caption = 'Swarm-Intelligence Demo'
-  ClientHeight = 558
-  ClientWidth = 700
+  ClientHeight = 597
+  ClientWidth = 832
   Color = clBtnFace
   DoubleBuffered = True
   Font.Charset = DEFAULT_CHARSET
@@ -20,43 +20,44 @@ object frmMain: TfrmMain
   TextHeight = 13
   object sbMain: TStatusBar
     Left = 0
-    Top = 539
-    Width = 700
+    Top = 578
+    Width = 832
     Height = 19
     AutoHint = True
     Panels = <
       item
         Width = 420
       end>
+    ExplicitTop = 539
+    ExplicitWidth = 700
   end
   object pnlMain: TPanel
     Left = 233
     Top = 0
-    Width = 467
-    Height = 539
+    Width = 599
+    Height = 578
     Align = alClient
     BevelOuter = bvNone
     ParentBackground = False
     TabOrder = 1
+    ExplicitWidth = 467
+    ExplicitHeight = 539
     object pbDisplay: TPaintBox
       AlignWithMargins = True
       Left = 0
       Top = 35
-      Width = 464
-      Height = 343
+      Width = 596
+      Height = 382
       Margins.Left = 0
       Align = alClient
       Color = clBtnFace
       ParentColor = False
-      ExplicitLeft = 8
-      ExplicitTop = 3
-      ExplicitWidth = 532
-      ExplicitHeight = 341
+      ExplicitLeft = 3
     end
     object splStatistics: TSplitter
       Left = 0
-      Top = 381
-      Width = 467
+      Top = 420
+      Width = 599
       Height = 5
       Cursor = crVSplit
       Align = alBottom
@@ -69,7 +70,7 @@ object frmMain: TfrmMain
       AlignWithMargins = True
       Left = 3
       Top = 3
-      Width = 464
+      Width = 596
       Height = 26
       Margins.Right = 0
       AutoSize = True
@@ -78,6 +79,7 @@ object frmMain: TfrmMain
       EdgeBorders = [ebLeft, ebTop, ebBottom]
       Images = ilIcons
       TabOrder = 0
+      ExplicitWidth = 464
       object tbGenerateGrid: TToolButton
         Left = 0
         Top = 0
@@ -145,12 +147,14 @@ object frmMain: TfrmMain
     object gbStatistics: TGroupBox
       AlignWithMargins = True
       Left = 3
-      Top = 389
-      Width = 461
+      Top = 428
+      Width = 593
       Height = 147
       Align = alBottom
       Caption = 'Statistik'
       TabOrder = 1
+      ExplicitTop = 389
+      ExplicitWidth = 461
       object lbTodoChart: TLabel
         Left = 184
         Top = 62
@@ -164,18 +168,19 @@ object frmMain: TfrmMain
     Left = 0
     Top = 0
     Width = 233
-    Height = 539
+    Height = 578
     VertScrollBar.Tracking = True
     Align = alLeft
     BevelInner = bvNone
     BorderStyle = bsNone
     TabOrder = 2
+    ExplicitHeight = 539
     object gbSimulation: TGroupBox
       AlignWithMargins = True
       Left = 3
       Top = 3
       Width = 227
-      Height = 110
+      Height = 133
       Align = alTop
       Caption = 'Einstellungen'
       TabOrder = 0
@@ -241,16 +246,27 @@ object frmMain: TfrmMain
         TabOrder = 1
         OnExit = edtInfluenceFactorExit
       end
+      object cbReturnToStart: TCheckBox
+        Left = 12
+        Top = 102
+        Width = 201
+        Height = 17
+        Caption = 'Am Ende zum Start zur'#252'ckkehren'
+        TabOrder = 3
+        OnClick = cbReturnToStartClick
+      end
     end
     object gbPopulation: TGroupBox
       AlignWithMargins = True
       Left = 3
-      Top = 213
+      Top = 236
       Width = 227
-      Height = 323
+      Height = 339
       Align = alClient
       Caption = 'Population'
       TabOrder = 1
+      ExplicitTop = 213
+      ExplicitHeight = 323
       object lbBatch: TLabel
         Left = 16
         Top = 27
@@ -319,12 +335,13 @@ object frmMain: TfrmMain
     object gbControl: TGroupBox
       AlignWithMargins = True
       Left = 3
-      Top = 119
+      Top = 142
       Width = 227
       Height = 88
       Align = alTop
       Caption = 'Steuerung'
       TabOrder = 2
+      ExplicitTop = 119
       DesignSize = (
         227
         88)
@@ -482,7 +499,7 @@ object frmMain: TfrmMain
     end
     object actEditorActive: TAction
       Category = 'Editor'
-      Caption = '...'
+      Caption = '[Toggle Editor]'
       Hint = 'Wechselt zwischen Simulations- und Editormodus.'
       OnExecute = actEditorActiveExecute
     end

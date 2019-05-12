@@ -32,6 +32,7 @@ type
       FPos: TVector2;
       FConnections: TConnections;
       FIndex: Integer;
+      FHasFood: Boolean;
 
     protected
       function GetPos: TVector2;
@@ -39,8 +40,8 @@ type
 
       function GetIsStart: Boolean;
       procedure SetIsStart(const Value: Boolean);
-      function GetIsFinish: Boolean;
-      procedure SetIsFinish(const Value: Boolean);
+      function GetHasFood: Boolean;
+      procedure SetHasFood(const Value: Boolean);
 
       function GetConnections: TConnections.TReader;
 
@@ -62,7 +63,7 @@ type
       function FindConnection(AOther: TPoint): TConnection;
 
       property IsStart: Boolean read GetIsStart;
-      property IsFinish: Boolean read GetIsFinish;
+      property HasFood: Boolean read FHasFood;
 
     end;
 
@@ -105,7 +106,6 @@ type
     FPoints: TPoints;
     FConnections: TConnections;
     FStartPoint: TPoint;
-    FFinishPoint: TPoint;
 
     function GetConnections: TConnections.TReader;
     function GetPoints: TPoints.TReader;
@@ -123,7 +123,6 @@ type
 
     procedure Clear;
 
-    procedure SetFinishPoint(const Value: TPoint);
     procedure SetStartPoint(const Value: TPoint);
 
     procedure Changed; virtual;
@@ -143,12 +142,9 @@ type
 
     /// <summary>A single start point for this graph.</summary>
     property StartPoint: TPoint read FStartPoint;
-    /// <summary>A single finish point for this graph.</summary>
-    property FinishPoint: TPoint read FFinishPoint;
 
+    /// <summary>Wether there is a start point.</summary>
     function HasStart: Boolean;
-    function HasFinish: Boolean;
-    function Valid: Boolean;
 
     // IJSerializable
     function GetJVersion: Integer;
@@ -179,7 +175,7 @@ type
       function Connect(AOther: TPoint): TConnection;
 
       property IsStart: Boolean read GetIsStart write SetIsStart;
-      property IsFinish: Boolean read GetIsFinish write SetIsFinish;
+      property HasFood: Boolean read GetHasFood write SetHasFood;
 
     end;
 
@@ -270,8 +266,6 @@ type
 
     function GetStartPoint: TPoint;
     procedure SetStartPoint(const Value: TPoint);
-    function GetFinishPoint: TPoint;
-    procedure SetFinishPoint(const Value: TPoint);
 
     function GetPoints: TPoints.TReader;
     function GetConnections: TConnections.TReader;
@@ -293,8 +287,6 @@ type
 
     /// <summary>A single start point for this graph.</summary>
     property StartPoint: TPoint read GetStartPoint write SetStartPoint;
-    /// <summary>A single finish point for this graph.</summary>
-    property FinishPoint: TPoint read GetFinishPoint write SetFinishPoint;
 
     /// <summary>Adds a point at the specified position and returns said point.</summary>
     function AddPoint(APos: TVector2): TPoint;
@@ -342,22 +334,19 @@ begin
     Graph.SetStartPoint(nil);
 end;
 
-function TGraph.TPoint.GetIsFinish: Boolean;
+procedure TGraph.TPoint.SetHasFood(const Value: Boolean);
 begin
-  Result := Self = Graph.FinishPoint;
-end;
-
-procedure TGraph.TPoint.SetIsFinish(const Value: Boolean);
-begin
-  if Value then
-    Graph.SetFinishPoint(Self)
-  else if Graph.FinishPoint = Self then
-    Graph.SetFinishPoint(nil);
+  FHasFood := Value;
 end;
 
 function TGraph.TPoint.GetConnections: TConnections.TReader;
 begin
   Result := FConnections.Reader;
+end;
+
+function TGraph.TPoint.GetHasFood: Boolean;
+begin
+  Result := FHasFood;
 end;
 
 constructor TGraph.TPoint.Create(AGraph: TGraph; APos: TVector2);
@@ -494,7 +483,7 @@ begin
   begin
     NewPoint := AddPointX(Point.Pos);
     NewPoint.SetIsStart(Point.IsStart);
-    NewPoint.SetIsFinish(Point.IsFinish);
+    NewPoint.SetHasFood(Point.HasFood);
   end;
 
   for Connection in AFrom.Connections do
@@ -538,10 +527,7 @@ procedure TGraph.Clear;
 begin
   FConnections.Clear;
   FPoints.Clear;
-
   FStartPoint := nil;
-  FFinishPoint := nil;
-
   Changed;
 end;
 
@@ -575,11 +561,6 @@ end;
 function TGraphEditable.GetConnections: TConnections.TReader;
 begin
   Result := TConnections.TReader(inherited GetConnections);
-end;
-
-function TGraphEditable.GetFinishPoint: TPoint;
-begin
-  Result := TPoint(inherited FinishPoint);
 end;
 
 function TGraphEditable.GetPoints: TPoints.TReader;
@@ -631,14 +612,14 @@ var
   JPointIndex: TJValue;
   JConnection: TJValue;
   JPoints: TJArray;
+  JFood: TJArray;
 begin
   case ASerializer.Mode of
     smSerialize:
       begin
         if StartPoint <> nil then
           ASerializer.Value['start'] := StartPoint.Index;
-        if FinishPoint <> nil then
-          ASerializer.Value['finish'] := FinishPoint.Index;
+        JFood := ASerializer.Value.AddArray('food');
 
         JArray := ASerializer.Value['points'];
         for Point in Points do
@@ -646,6 +627,8 @@ begin
           JPoint := JArray.AddArray;
           JPoint[0] := Point.Pos.X;
           JPoint[1] := Point.Pos.Y;
+          if Point.HasFood then
+            JFood.Add(Point.Index);
         end;
 
         JArray := ASerializer.Value['connections'];
@@ -683,8 +666,8 @@ begin
 
         if ASerializer.Value.Get('start', JPointIndex) then
           FStartPoint := Points[JPointIndex];
-        if ASerializer.Value.Get('finish', JPointIndex) then
-          FFinishPoint := Points[JPointIndex];
+        for JPointIndex in ASerializer.Value['food'].AsArray do
+          FPoints[JPointIndex].SetHasFood(True);
       end;
   end;
 end;
@@ -718,19 +701,9 @@ begin
   Result := FPoints.Reader;
 end;
 
-function TGraph.HasFinish: Boolean;
-begin
-  Result := FinishPoint <> nil;
-end;
-
 function TGraph.HasStart: Boolean;
 begin
   Result := StartPoint <> nil;
-end;
-
-function TGraph.Valid: Boolean;
-begin
-  Result := HasStart and HasFinish;
 end;
 
 procedure TGraph.Remove(AConnection: TConnection);
@@ -751,25 +724,12 @@ begin
   FPoints.RemoveAt(APoint.Index);
 end;
 
-procedure TGraph.SetFinishPoint(const Value: TPoint);
-begin
-  if FinishPoint = Value then
-    Exit;
-  FFinishPoint := Value;
-  Changed;
-end;
-
 procedure TGraph.SetStartPoint(const Value: TPoint);
 begin
   if StartPoint = Value then
     Exit;
   FStartPoint := Value;
   Changed;
-end;
-
-procedure TGraphEditable.SetFinishPoint(const Value: TPoint);
-begin
-  inherited SetFinishPoint(Value);
 end;
 
 procedure TGraphEditable.SetStartPoint(const Value: TPoint);
@@ -918,7 +878,6 @@ var
   A, B, C: TPoint;
   Line: TLine2;
   Side: TLineSide;
-  AllInside: Boolean;
 begin
   for A in Graph.Points do
   begin
@@ -960,8 +919,6 @@ end;
 procedure TGraphEditable.TDelaunayTriangulator.Generate;
 var
   A, B, C, D: TPoint;
-  Center: TVector2;
-  Radius: Single;
   DelaunayMet: Boolean;
 begin
   for A in Graph.Points do

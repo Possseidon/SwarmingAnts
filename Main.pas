@@ -126,6 +126,7 @@ type
     ToolButton2: TToolButton;
     actTriangulate: TAction;
     actTriangulateDelaunay: TAction;
+    cbReturnToStart: TCheckBox;
     procedure actClearExecute(Sender: TObject);
     procedure actConnectionToolExecute(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -149,6 +150,7 @@ type
     procedure actStartUpdate(Sender: TObject);
     procedure actTriangulateDelaunayExecute(Sender: TObject);
     procedure actTriangulateExecute(Sender: TObject);
+    procedure cbReturnToStartClick(Sender: TObject);
     procedure edtInfluenceFactorExit(Sender: TObject);
     procedure edtPheromoneDissipationExit(Sender: TObject);
     procedure FormMouseWheel(Sender: TObject; Shift: TShiftState; WheelDelta: Integer; MousePos: TPoint;
@@ -340,7 +342,7 @@ end;
 
 procedure TfrmMain.actGenerateUpdate(Sender: TObject);
 begin
-  actGenerate.Enabled := PheromoneData.Graph.Valid;
+  actGenerate.Enabled := PheromoneData.Graph.HasStart;
 end;
 
 procedure TfrmMain.actHidePathExecute(Sender: TObject);
@@ -365,7 +367,7 @@ end;
 
 procedure TfrmMain.actStartUpdate(Sender: TObject);
 begin
-  actStart.Enabled := PheromoneData.Graph.Valid;
+  actStart.Enabled := PheromoneData.Graph.HasStart;
   if tmrUpdate.Enabled then
     actStart.Caption := 'Stop'
   else
@@ -396,6 +398,14 @@ begin
     Generator.Free;
   end;
   pbDisplay.Invalidate;
+end;
+
+procedure TfrmMain.cbReturnToStartClick(Sender: TObject);
+begin
+  if Editable then
+    Exit;
+  FSimulation.MustReturn := cbReturnToStart.Checked;
+  cbReturnToStart.Checked := FSimulation.MustReturn;
 end;
 
 procedure TfrmMain.DisplayToolChange;
@@ -509,6 +519,7 @@ begin
   seBatchSizeExit(nil);
   edtInfluenceFactorExit(nil);
   edtPheromoneDissipationExit(nil);
+  cbReturnToStartClick(nil);
 end;
 
 function TfrmMain.GetSimulationDisplay: TSimulationDisplay;

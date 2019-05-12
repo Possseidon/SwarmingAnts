@@ -1,0 +1,11 @@
+- TODO - 
+[ ] Change Graph to have one start and a lot of food points
+[ ] Get editor working
+[ ] Random Point Generator
+[ ] Normal triangulator
+[ ] Delaunay triangulator
+[ ] Running in realtime must update everything
+[ ] Statistics
+[ ] Save
+[ ] New
+[ ] Report T_T

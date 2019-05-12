@@ -7,6 +7,7 @@ uses
   System.Math,
 
   Pengine.Collections,
+  Pengine.HashCollections,
   Pengine.Vector,
   Pengine.EventHandling,
   Pengine.CollectionInterfaces,
@@ -57,6 +58,7 @@ type
     FPath: TPath;
     FPoints: TPoints;
     FPathLength: Single;
+    FMustReturn: Boolean;
 
     function GetPheromoneAmount: Single;
 
@@ -67,7 +69,7 @@ type
     function GetPoints: TPoints.TReader;
 
   public
-    constructor Create(APheromoneData: TPheromoneData);
+    constructor Create(APheromoneData: TPheromoneData; AMustReturn: Boolean);
     destructor Destroy; override;
 
     property Graph: TGraph read GetGraph;
@@ -85,6 +87,8 @@ type
     property PathLength: Single read FPathLength;
     /// <summary>An arbitrary value ranging from 0 to 1, depending on how short the path is or zero on failure.</summary>
     property PheromoneAmount: Single read GetPheromoneAmount;
+
+    property MustReturn: Boolean read FMustReturn;
 
     /// <summary>Simulates the ant to traverse the graph.</summary>
     procedure FindPath;
@@ -142,6 +146,7 @@ type
     FPheromoneDissipation: Single;
     FBatchSize: Integer;
     FBatches: TBatches;
+    FMustReturn: Boolean;
 
     function GetBatches: TBatches.TReader;
     function GetPheromoneData: TPheromoneData;
@@ -157,6 +162,8 @@ type
     property BatchSize: Integer read FBatchSize write FBatchSize;
     property Batches: TBatches.TReader read GetBatches;
 
+    property MustReturn: Boolean read FMustReturn write FMustReturn;
+
     function GenerateBatch: TBatch;
 
     property InfluencedFactor: Single read FInfluencedFactor write FInfluencedFactor;
@@ -171,12 +178,13 @@ implementation
 
 { TAnt }
 
-constructor TAnt.Create(APheromoneData: TPheromoneData);
+constructor TAnt.Create(APheromoneData: TPheromoneData; AMustReturn: Boolean);
 begin
   FPheromoneData := APheromoneData;
-  FPassedPoints := TBitfield.Create(Graph.Connections.Count);
+  FPassedPoints := TBitfield.Create(Graph.Points.Count);
   FPath := TPath.Create;
   FPoints := TPoints.Create;
+  FMustReturn := AMustReturn;
 end;
 
 destructor TAnt.Destroy;
@@ -255,11 +263,22 @@ procedure TAnt.FindPath;
 var
   Current: TGraph.TPoint;
   Connection: TGraph.TConnection;
+  PointsToPass: TBitfield;
+  AllPassedPoints: TBitfield;
+  Point: TGraph.TPoint;
 begin
+  PointsToPass := TBitfield.Create(Graph.Points.Count);
+  AllPassedPoints := TBitfield.Create(Graph.Points.Count);
+  for Point in Graph.Points do
+    if Point.HasFood then
+      PointsToPass[Point.Index] := True;
+
   Current := Graph.StartPoint;
   FPoints.Add(Current);
   FPassedPoints[Current.Index] := True;
-  while Current <> Graph.FinishPoint do
+  AllPassedPoints[Current.Index] := True;
+  FSuccess := True;
+  while not PointsToPass.Empty or MustReturn and (Current <> Graph.StartPoint) do
   begin
     if ChooseConnection(Current, Connection) then
     begin
@@ -267,20 +286,36 @@ begin
       Current := Connection.Other(Current);
       FPoints.Add(Current);
       FPassedPoints[Current.Index] := True;
+      AllPassedPoints[Current.Index] := True;
+
+      if PointsToPass[Current.Index] then
+      begin
+        PointsToPass[Current.Index] := False;
+        FPassedPoints.Clear;
+        FPassedPoints[Current.Index] := True;
+      end;
     end
     else
     begin
       if Path.Empty then
+      begin
+        FSuccess := False;
         Break;
+      end;
       Current := FPath.Last.Other(Current);
       FPoints.RemoveLast;
       FPath.RemoveLast;
     end;
   end;
+
+  FPassedPoints.Assign(AllPassedPoints);
+
+  PointsToPass.Free;
+  AllPassedPoints.Free;
+
   FPathLength := 0;
   for Connection in Path do
     FPathLength := FPathLength + Connection.Cost;
-  FSuccess := Current = Graph.FinishPoint;
 end;
 
 function TAnt.GetGraph: TGraph;
@@ -374,7 +409,7 @@ begin
   FAnts := TAnts.Create;
   for I := 0 to ACount - 1 do
   begin
-    Ant := TAnt.Create(PheromoneData);
+    Ant := TAnt.Create(PheromoneData, Simulation.MustReturn);
     Ant.InfluencedFactor := Simulation.InfluencedFactor;
     FAnts.Add(Ant);
     Ant.FindPath;
