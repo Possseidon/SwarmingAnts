@@ -37,7 +37,7 @@ uses
   GraphDefine,
   MiniDialogGenerateGrid,
   AntDefine,
-  Vcl.Grids;
+  Vcl.Grids, VclTee.TeeGDIPlus, VCLTee.TeEngine, VCLTee.Series, VCLTee.TeeProcs, VCLTee.Chart;
 
 type
 
@@ -105,7 +105,6 @@ type
     seBatch: TSpinEdit;
     lbBatch: TLabel;
     gbStatistics: TGroupBox;
-    lbTodoChart: TLabel;
     splStatistics: TSplitter;
     dlgSave: TSaveDialog;
     dlgOpen: TOpenDialog;
@@ -127,6 +126,11 @@ type
     actTriangulate: TAction;
     actTriangulateDelaunay: TAction;
     cbReturnToStart: TCheckBox;
+    tcStatistics: TChart;
+    csBest: TFastLineSeries;
+    csAverage: TFastLineSeries;
+    csMedian: TFastLineSeries;
+    csWorst: TFastLineSeries;
     procedure actClearExecute(Sender: TObject);
     procedure actConnectionToolExecute(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
@@ -221,6 +225,11 @@ begin
   sgStatistics.Cells[1, 0] := 'Worst';
   sgStatistics.Cells[2, 0] := 'Average';
   sgStatistics.Cells[3, 0] := 'Median';
+
+  csBest.Clear;
+  csAverage.Clear;
+  csMedian.Clear;
+  csWorst.Clear;
 end;
 
 procedure TfrmMain.actEditorActiveExecute(Sender: TObject);
@@ -307,6 +316,10 @@ begin
   SyncSimulationData;
   GenerateAntList;
   pbDisplay.Invalidate;
+  csBest.Clear;
+  csAverage.Clear;
+  csMedian.Clear;
+  csWorst.Clear;
 end;
 
 procedure TfrmMain.actResetViewExecute(Sender: TObject);
@@ -333,6 +346,8 @@ begin
 end;
 
 procedure TfrmMain.actGenerateExecute(Sender: TObject);
+var
+  Stats: TSimulation.TStatistic;
 begin
   FSimulation.GenerateBatch;
   seBatch.MaxValue := FSimulation.Batches.Count;
@@ -340,6 +355,12 @@ begin
   seBatch.Enabled := FSimulation.Batches.Count > 1;
   GenerateAntList;
   pbDisplay.Invalidate;
+
+  Stats := FSimulation.Batches.Last.GetPathLengthStatistic;
+  csBest.Add(Stats[stBest]);
+  csAverage.Add(Stats[stAverage]);
+  csMedian.Add(Stats[stMedian]);
+  csWorst.Add(Stats[stWorst]);
 end;
 
 procedure TfrmMain.actGenerateUpdate(Sender: TObject);
@@ -463,7 +484,10 @@ var
   S: TSimulation.TStatisticType;
   Stats: TSimulation.TStatistic;
 begin
-  SimulationDisplay.PheromoneData := FSimulation.PheromoneData;
+  if FSimulation.Batches.RangeCheck(seBatch.Value - 1) then
+    SimulationDisplay.PheromoneData := FSimulation.Batches[seBatch.Value - 1].PheromoneData
+  else
+    SimulationDisplay.PheromoneData := FSimulation.PheromoneData;
 
   if FSimulation.Batches.Empty then
   begin
@@ -654,6 +678,7 @@ begin
 
   tbDisplay.Visible := Editable;
   sbSidebar.Visible := not Editable;
+  gbStatistics.Height := IfThen(Editable, 0, 200);
 
   alMain.EnumByCategory(
     procedure(const Action: TContainedAction; var Done: Boolean)

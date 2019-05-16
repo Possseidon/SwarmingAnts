@@ -43,16 +43,17 @@ object frmMain: TfrmMain
       Left = 0
       Top = 35
       Width = 596
-      Height = 382
+      Height = 329
       Margins.Left = 0
       Align = alClient
       Color = clBtnFace
       ParentColor = False
       ExplicitLeft = 3
+      ExplicitHeight = 382
     end
     object splStatistics: TSplitter
       Left = 0
-      Top = 420
+      Top = 367
       Width = 599
       Height = 5
       Cursor = crVSplit
@@ -142,18 +143,75 @@ object frmMain: TfrmMain
     object gbStatistics: TGroupBox
       AlignWithMargins = True
       Left = 3
-      Top = 428
+      Top = 375
       Width = 593
-      Height = 147
+      Height = 200
       Align = alBottom
       Caption = 'Statistik'
       TabOrder = 1
-      object lbTodoChart: TLabel
-        Left = 184
-        Top = 62
-        Width = 63
-        Height = 13
-        Caption = 'TODO: Chart'
+      object tcStatistics: TChart
+        Left = 2
+        Top = 15
+        Width = 589
+        Height = 183
+        View3D = False
+        Align = alClient
+        TabOrder = 0
+        ExplicitLeft = 216
+        ExplicitTop = 32
+        ExplicitWidth = 400
+        ExplicitHeight = 250
+        DefaultCanvas = 'TGDIPlusCanvas'
+        ColorPaletteIndex = 13
+        object csBest: TFastLineSeries
+          SeriesColor = clLime
+          Title = 'Best'
+          LinePen.Color = clLime
+          LinePen.Width = 2
+          XValues.Name = 'X'
+          XValues.Order = loAscending
+          YValues.Name = 'Y'
+          YValues.Order = loNone
+          Data = {
+            001900000000000000002879400000000000D87D400000000000948140000000
+            0000CC80400000000000A881400000000000A480400000000000708240000000
+            0000507E4000000000001078400000000000F87B4000000000007C8040000000
+            0000308140000000000078844000000000008086400000000000B08340000000
+            000008864000000000008487400000000000C087400000000000DC8940000000
+            0000A48A4000000000004C884000000000008C89400000000000F48540000000
+            00006885400000000000EC8340}
+          Detail = {0000000000}
+        end
+        object csAverage: TFastLineSeries
+          SeriesColor = 16744448
+          Title = 'Average'
+          LinePen.Color = 16744448
+          LinePen.Width = 2
+          XValues.Name = 'X'
+          XValues.Order = loAscending
+          YValues.Name = 'Y'
+          YValues.Order = loNone
+        end
+        object csMedian: TFastLineSeries
+          SeriesColor = 4227327
+          Title = 'Median'
+          LinePen.Color = 4227327
+          LinePen.Width = 2
+          XValues.Name = 'X'
+          XValues.Order = loAscending
+          YValues.Name = 'Y'
+          YValues.Order = loNone
+        end
+        object csWorst: TFastLineSeries
+          SeriesColor = clRed
+          Title = 'Worst'
+          LinePen.Color = clRed
+          LinePen.Width = 2
+          XValues.Name = 'X'
+          XValues.Order = loAscending
+          YValues.Name = 'Y'
+          YValues.Order = loNone
+        end
       end
     end
   end
@@ -219,7 +277,7 @@ object frmMain: TfrmMain
         MaxValue = 500
         MinValue = 1
         TabOrder = 0
-        Value = 20
+        Value = 100
         OnExit = seBatchSizeExit
       end
       object edtPheromoneDissipation: TEdit
