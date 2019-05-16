@@ -238,14 +238,12 @@ type
 
     TTriangulator = class(TGenerator)
     private
-      // Outline is CCW
-      FOutline: TPoints;
+      FCenter: TPoint;
+      FPoints: TPoints;
 
-      procedure AddToOutline(APoint: TPoint);
-
-      procedure GenerateOutline;
-      procedure GenerateOutline2;
-      procedure Triangulate;
+      procedure FindCenter;
+      procedure GeneratePoints;
+      procedure GenerateTriangles;
 
     public
       constructor Create(AGraph: TGraphEditable); override;
@@ -258,7 +256,7 @@ type
     TDelaunayTriangulator = class(TGenerator)
     public
       procedure Generate; override;
-      
+
     end;
 
   private
@@ -710,7 +708,7 @@ procedure TGraph.Remove(AConnection: TConnection);
 var
   I: Integer;
 begin
-  for I := AConnection.Index to Connections.MaxIndex do
+  for I := AConnection.Index + 1 to Connections.MaxIndex do
     Dec(FConnections[I].FIndex);
   FConnections.RemoveAt(AConnection.Index);
 end;
@@ -772,186 +770,226 @@ var
 begin
   for I := 0 to Count - 1 do
     Graph.AddPoint(Bounds[TVector2.Random]);
+    // Graph.AddPoint(TVector2.RandomNormal * (Random + 0.5) * 200);
 end;
 
 { TGraphEditable.TTriangulator }
 
-procedure TGraphEditable.TTriangulator.AddToOutline(APoint: TPoint);
-var
-  I, MinI: Integer;
-  A, B: TPoint;
-  Line: TLine2;
-  S, MinS, NewS: Single;
-  After: Boolean;
-begin
-  MinS := Infinity;
-  MinI := -1;
-  After := False;
-  for I := 0 to FOutline.MaxIndex do
-  begin
-    A := FOutline[I];
-    B := FOutline[(I + 1) mod FOutline.Count];
-    Line := A.Pos.LineTo(B.Pos);
-
-    if Line.Side(APoint.Pos) <> lsRight then
-      Continue;
-
-    S := Line.OrthoProj(APoint.Pos);
-    if S in Bounds1(0, 1) then
-    begin
-      // Insert point
-      FOutline.Insert(APoint, I);
-      Exit;
-    end;
-
-    NewS := Min(Abs(S), Abs(S - 1));
-    if NewS < MinS then
-    begin
-      MinI := I;
-      MinS := NewS;
-      After := Abs(S - 1) > Abs(S);
-    end;
-  end;
-
-  if MinI = -1 then
-    Exit;
-
-  if After then
-    FOutline[(MinI + 1) mod FOutline.Count] := APoint
-  else
-    FOutline[MinI] := APoint;
-
-end;
-
 constructor TGraphEditable.TTriangulator.Create(AGraph: TGraphEditable);
 begin
   inherited;
-  FOutline := TPoints.Create;
+  FPoints := TPoints.Create;
 end;
 
 destructor TGraphEditable.TTriangulator.Destroy;
 begin
-  FOutline.Free;
+  FPoints.Free;
   inherited;
 end;
 
-procedure TGraphEditable.TTriangulator.Generate;
-begin
-  if Graph.Points.Count = 2 then
-    Graph.Points[0].Connect(Graph.Points[1])
-  else if Graph.Points.Count >= 3 then
-  begin
-    GenerateOutline2;
-    Triangulate;
-  end;
-end;
-
-procedure TGraphEditable.TTriangulator.GenerateOutline;
+procedure TGraphEditable.TTriangulator.FindCenter;
 var
-  I: Integer;
-  Side: TLineSide;
+  CenterPos: TVector2;
+  Point: TPoint;
+  Distance, ClosestDistance: Single;
 begin
-  // Choose two arbirary points
-  FOutline.Add(Graph.Points[0]);
-  Side := Graph.Points[0].Pos.LineTo(Graph.Points[1].Pos).Side(Graph.Points[2].Pos);
-  if Side = lsLeft then
-  begin
-    FOutline.Add(Graph.Points[1]);
-    FOutline.Add(Graph.Points[2]);
-  end
-  else
-  begin
-    FOutline.Add(Graph.Points[1]);
-    FOutline.Add(Graph.Points[2]);
-  end;
+  CenterPos := 0;
+  for Point in Graph.Points do
+    CenterPos := CenterPos + Point.Pos;
+  CenterPos := CenterPos / Graph.Points.Count;
 
-  // Integegrate all other points
-  for I := 3 to Graph.Points.MaxIndex do
-    AddToOutline(Graph.Points[I]);
-
-  for I := 0 to FOutline.MaxIndex do
-    FOutline[I].Connect(FOutline[(I + 1) mod FOutline.Count]);
-end;
-
-procedure TGraphEditable.TTriangulator.GenerateOutline2;
-var
-  A, B, C: TPoint;
-  Line: TLine2;
-  Side: TLineSide;
-begin
-  for A in Graph.Points do
+  ClosestDistance := Infinity;
+  for Point in Graph.Points do
   begin
-    for B in Graph.Points do
+    Distance := CenterPos.DistanceTo(Point.Pos);
+    if Distance < ClosestDistance then
     begin
-      if A = B then
-        Continue;
-    
-      Line := A.Pos.LineTo(B.Pos);
-      Side := lsOn;
-      for C in Graph.Points do
-      begin
-        if (C = A) or (C = B) then
-          Continue;
-      
-        if Side = lsOn then
-          Side := Line.Side(C.Pos)
-        else if Side <> Line.Side(C.Pos) then
-        begin
-          Side := lsOn;
-          Break;
-        end;
-      end;
-
-      if Side <> lsOn then
-        A.Connect(B);
-
+      FCenter := Point;
+      ClosestDistance := Distance;
     end;
   end;
 end;
 
-procedure TGraphEditable.TTriangulator.Triangulate;
+procedure TGraphEditable.TTriangulator.Generate;
 begin
+  if Graph.Points.Empty then
+    Exit;
 
+  FindCenter;
+  GeneratePoints;
+  GenerateTriangles;
 end;
+
+procedure TGraphEditable.TTriangulator.GeneratePoints;
+var
+  Point: TPoint;
+begin
+  for Point in Graph.Points do
+    if Point <> FCenter then
+      FPoints.Add(Point);
+  FPoints.Sort(
+    function(A, B: TPoint): Boolean
+    begin
+      Result := FCenter.Pos.VectorTo(A.Pos).AngleRad < FCenter.Pos.VectorTo(B.Pos).AngleRad;
+    end);
+end;
+
+procedure TGraphEditable.TTriangulator.GenerateTriangles;
+var
+  I: Integer;
+  A, B, C: TPoint;
+  Outline: TPoints;
+  OutlineCorrect: Boolean;
+begin
+  Outline := TPoints.Create;
+  for I := 0 to FPoints.MaxIndex do
+  begin
+    A := FPoints[I];
+    B := FPoints[(I + 1) mod FPoints.Count];
+    FCenter.Connect(A);
+    if A.Pos.LineTo(B.Pos).Side(FCenter.Pos) = lsLeft then
+    begin
+      Outline.Add(A);
+      A.Connect(B);
+    end;
+  end;
+
+  repeat
+    OutlineCorrect := True;
+    I := 0;
+    while I < Outline.Count do
+    begin
+      A := Outline[I];
+      B := Outline[(I + 1) mod Outline.Count];
+      C := Outline[(I + 2) mod Outline.Count];
+      if A.Pos.LineTo(C.Pos).Side(B.Pos) = lsLeft then
+      begin
+        A.Connect(C);
+        OutlineCorrect := False;
+        Outline.RemoveAt((I + 1) mod Outline.Count);
+      end
+      else
+        Inc(I);
+    end;
+
+  until OutlineCorrect;
+
+  Outline.Free;
+end;
+
+{ TGraphEditable.TDelaunayTriangulator }
+
+{
+  procedure TGraphEditable.TDelaunayTriangulator.Generate;
+  var
+  A, B, C, D: TPoint;
+  DelaunayMet: Boolean;
+  begin
+  for A in Graph.Points do
+  begin
+  for B in Graph.Points do
+  begin
+  if A = B then
+  Continue;
+  for C in Graph.Points do
+  begin
+  if (C = A) or (C = B) then
+  Continue;
+  DelaunayMet := True;
+  for D in Graph.Points do
+  begin
+  if (D = A) or (D = B) or (D = C) then
+  Continue;
+  if D.Pos.InCircumcircle(A.Pos, B.Pos, C.Pos) then
+  begin
+  DelaunayMet := False;
+  Break;
+  end;
+  end;
+
+  if DelaunayMet then
+  begin
+  A.Connect(B);
+  B.Connect(C);
+  C.Connect(A);        
+  end;
+  end;
+  end;
+  end;
+  end;
+}
 
 { TGraphEditable.TDelaunayTriangulator }
 
 procedure TGraphEditable.TDelaunayTriangulator.Generate;
 var
-  A, B, C, D: TPoint;
-  DelaunayMet: Boolean;
+  Connection, InnerConnection, Connection2: TGraph.TConnection;
+  DelaunayMet, Inside: Boolean;
+  Quad: array [0 .. 3] of TGraph.TPoint;
+  Heights: array [2 .. 3] of Single;
+  Height: Single;
+  I, J, Count: Integer;
+  OtherPoint: TGraph.TPoint;
+  Factors: TLine2.TIntsecFactors;
 begin
-  for A in Graph.Points do
-  begin
-    for B in Graph.Points do
+  repeat
+    DelaunayMet := True;
+    I := 0;
+    Count := Graph.Connections.Count;
+    while I < Count do
     begin
-      if A = B then
-        Continue;
-      for C in Graph.Points do
+      Connection := Graph.Connections[I];
+      Quad[0] := Connection.PointA;
+      Quad[1] := Connection.PointB;
+      Quad[2] := nil;
+      Quad[3] := nil;
+      Heights[2] := Infinity;
+      Heights[3] := -Infinity;
+      for InnerConnection in Connection.PointA.Connections do
       begin
-        if (C = A) or (C = B) then
+        if Connection = InnerConnection then
           Continue;
-        DelaunayMet := True;
-        for D in Graph.Points do
+        OtherPoint := InnerConnection.Other(Connection.PointA);
+
+        if not Connection.PointB.IsConnected(OtherPoint) then
+          Continue;
+
+        Height := Quad[0].Pos.LineTo(Quad[1].Pos).Height(OtherPoint.Pos);
+        if Height > 0 then
         begin
-          if (D = A) or (D = B) or (D = C) then
-            Continue;
-          if D.Pos.InCircumcircle(A.Pos, B.Pos, C.Pos) then
+          if Height < Heights[2] then
           begin
-            DelaunayMet := False;
-            Break;
+            Heights[2] := Height;
+            Quad[2] := OtherPoint;
+          end;
+        end
+        else
+        begin
+          if Height > Heights[3] then
+          begin
+            Heights[3] := Height;
+            Quad[3] := OtherPoint;
           end;
         end;
+      end;
 
-        if DelaunayMet then
+      if (Quad[2] <> nil) and (Quad[3] <> nil) then
+      begin
+        if Quad[0].Pos.LineTo(Quad[1].Pos).Intsec(Quad[2].Pos.LineTo(Quad[3].Pos), Factors) and
+          (Factors.Factor in Bounds1(0, 1)) and
+          (Quad[0].Pos.DistanceTo(Quad[1].Pos) > Quad[2].Pos.DistanceTo(Quad[3].Pos)) then
         begin
-          A.Connect(B);
-          B.Connect(C);
-          C.Connect(A);        
+          // Flip
+          Graph.Remove(Connection);
+          Dec(Count);
+          Graph.ConnectX(Quad[2], Quad[3]);
+          DelaunayMet := False;
+          Continue;
         end;
       end;
+      Inc(I);
     end;
-  end;
+  until DelaunayMet;
 end;
 
 end.

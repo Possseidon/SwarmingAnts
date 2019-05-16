@@ -297,6 +297,8 @@ end;
 
 procedure TfrmMain.actResetExecute(Sender: TObject);
 begin
+  if FSimulation = nil then
+    Exit;
   SimulationDisplay.VisibleAnt := nil;
   seBatch.MaxValue := 1;
   seBatch.Value := 1;
@@ -358,6 +360,7 @@ end;
 procedure TfrmMain.actStartExecute(Sender: TObject);
 begin
   tmrUpdate.Enabled := not tmrUpdate.Enabled;
+  GenerateAntList;
 end;
 
 procedure TfrmMain.actStartToolExecute(Sender: TObject);
@@ -473,6 +476,9 @@ begin
     for S := Low(TSimulation.TStatisticType) to High(TSimulation.TStatisticType) do
       sgStatistics.Cells[Ord(S), 1] := Round(Stats[S]).ToString;
   end;
+
+  if tmrUpdate.Enabled then
+    Exit;
 
   lvAnts.Items.BeginUpdate;
   try
@@ -665,8 +671,7 @@ begin
     Exit;
   end;
 
-  FSimulation.GenerateBatch;
-  pbDisplay.Invalidate;
+  actGenerateExecute(nil);
 end;
 
 end.

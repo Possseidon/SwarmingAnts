@@ -2,10 +2,43 @@
 [ ] Change Graph to have one start and a lot of food points
 [ ] Get editor working
 [ ] Random Point Generator
-[ ] Normal triangulator
 [ ] Delaunay triangulator
 [ ] Running in realtime must update everything
 [ ] Statistics
 [ ] Save
 [ ] New
 [ ] Report T_T
+
+- How do I want the editor to work -
+-> Modes:
+  - Points -> Create new points wherever you click or move points
+  - Connections-> Allows dragging between points
+  - Delete -> Removes point or connection you click on
+  - Set Start -> Sets the start and then goes back to the move tool
+  - Do Food -> Toggle food on the clicked point
+-> Camera on right click, zoom using scroll
+-> Clear connections
+-> Clear all
+-> Fill with food
+-> Clear food
+-> Generate NxM Net of points and connections
+-> Generate Triangulation
+-> Generate N random points
+
+- New Ant Algorithm -
+-> Spawn at start
+-> Move
+-> Record all points
+-> If point is already passed, go back
+-> Repeat until a food point is found
+-> Then reset the list of recorded points
+-> Repeat until all food points have been visited (and, if necessary, the start has been reached)
+
+Pseudocode:
+
+spawn ant;
+while not done do
+  find possible move;
+  perform move;
+  passedpoints[current]  
+end

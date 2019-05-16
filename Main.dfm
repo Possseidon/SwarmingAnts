@@ -28,8 +28,6 @@ object frmMain: TfrmMain
       item
         Width = 420
       end>
-    ExplicitTop = 539
-    ExplicitWidth = 700
   end
   object pnlMain: TPanel
     Left = 233
@@ -40,8 +38,6 @@ object frmMain: TfrmMain
     BevelOuter = bvNone
     ParentBackground = False
     TabOrder = 1
-    ExplicitWidth = 467
-    ExplicitHeight = 539
     object pbDisplay: TPaintBox
       AlignWithMargins = True
       Left = 0
@@ -79,7 +75,6 @@ object frmMain: TfrmMain
       EdgeBorders = [ebLeft, ebTop, ebBottom]
       Images = ilIcons
       TabOrder = 0
-      ExplicitWidth = 464
       object tbGenerateGrid: TToolButton
         Left = 0
         Top = 0
@@ -153,8 +148,6 @@ object frmMain: TfrmMain
       Align = alBottom
       Caption = 'Statistik'
       TabOrder = 1
-      ExplicitTop = 389
-      ExplicitWidth = 461
       object lbTodoChart: TLabel
         Left = 184
         Top = 62
@@ -174,7 +167,6 @@ object frmMain: TfrmMain
     BevelInner = bvNone
     BorderStyle = bsNone
     TabOrder = 2
-    ExplicitHeight = 539
     object gbSimulation: TGroupBox
       AlignWithMargins = True
       Left = 3
@@ -265,8 +257,6 @@ object frmMain: TfrmMain
       Align = alClient
       Caption = 'Population'
       TabOrder = 1
-      ExplicitTop = 213
-      ExplicitHeight = 323
       object lbBatch: TLabel
         Left = 16
         Top = 27
@@ -341,7 +331,6 @@ object frmMain: TfrmMain
       Align = alTop
       Caption = 'Steuerung'
       TabOrder = 2
-      ExplicitTop = 119
       DesignSize = (
         227
         88)

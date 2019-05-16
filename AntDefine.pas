@@ -93,7 +93,9 @@ type
     /// <summary>Simulates the ant to traverse the graph.</summary>
     procedure FindPath;
     /// <summary>Leaves a trail on the graph, depending on how good the ant did and wether the finish was reached at all.</summary>
-    procedure LeaveTrail;
+    procedure LeaveTrail; overload;
+    /// <summary>Leaves a trail on the graph, depending only on the specified amount.</summary>
+    procedure LeaveTrail(AAmount: Single); overload;
 
     /// <summary>Whether the ant managed to find a finish.</summary>
     property Success: Boolean read FSuccess;
@@ -331,7 +333,8 @@ end;
 function TAnt.GetPheromoneAmount: Single;
 begin
   if Success then
-    Result := Power(1.01, -PathLength)
+    // Result := Power(1.001, -PathLength)
+    Result := 1000 / (1 + Sqr(PathLength))
   else
     Result := 0;
 end;
@@ -339,6 +342,11 @@ end;
 function TAnt.GetPoints: TPoints.TReader;
 begin
   Result := FPoints.Reader;
+end;
+
+procedure TAnt.LeaveTrail(AAmount: Single);
+begin
+  PheromoneData.LeaveTrail(FPath, AAmount);
 end;
 
 procedure TAnt.LeaveTrail;
@@ -404,8 +412,7 @@ var
 begin
   FSimulation := ASimulation;
   FPheromoneData := Simulation.PheromoneData.Copy;
-  PheromoneData.Dissipate(Simulation.PheromoneDissipation);
-
+  
   FAnts := TAnts.Create;
   for I := 0 to ACount - 1 do
   begin
@@ -415,15 +422,17 @@ begin
     Ant.FindPath;
   end;
 
-  for Ant in Ants do
-    Ant.LeaveTrail;
-
   FAnts.Sort(
     function(A, B: TAnt): Boolean
     begin
       Result := A.PathLength < B.PathLength;
     end
   );
+
+  PheromoneData.Dissipate(Simulation.PheromoneDissipation);
+  for I := 0 to Ants.MaxIndex do
+    if Ants[I].PathLength <> 0 then
+      Ants[I].LeaveTrail(Power(0.001, I / Ants.Count) * Sqr(Ants.First.PathLength / Ant.PathLength));
 end;
 
 destructor TSimulation.TBatch.Destroy;
